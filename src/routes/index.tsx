@@ -1,24 +1,45 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useHydrated } from "@tanstack/react-router";
+import { Toaster } from "sonner";
+import { cn } from "@/lib/utils";
+import { InstagramMode } from "@/gallery/instagram";
+import { GalleryProvider, useGallery } from "@/gallery/store";
+import { PlatformSwitcher } from "@/gallery/switcher";
+import { TikTokMode } from "@/gallery/tiktok";
+import { XMode } from "@/gallery/x";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "Social Gallery V1 — personal offline gallery prototype" },
+      { name: "description", content: "Browse your personal gallery in Instagram, X and TikTok style views. Offline prototype with demo media." },
+      { property: "og:title", content: "Social Gallery V1" },
+      { property: "og:description", content: "A personal offline gallery prototype with three social-style views." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
+  const hydrated = useHydrated();
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="flex min-h-[100dvh] items-center justify-center bg-stage">
+      {hydrated ? <GalleryProvider><Phone /></GalleryProvider> : <div className="phone-frame bg-media" />}
+    </div>
+  );
+}
+
+function Phone() {
+  const g = useGallery();
+  const { mode, dark } = g.state;
+  return (
+    <div data-mode={mode} className={cn("phone-frame relative overflow-hidden bg-background text-foreground", (mode !== "ig" || dark) && "dark")}>
+      <div key={mode} className="h-full animate-in fade-in zoom-in-[0.98] duration-300">
+        {mode === "ig" ? <InstagramMode /> : mode === "x" ? <XMode /> : <TikTokMode />}
+      </div>
+      <PlatformSwitcher />
+      <Toaster position="top-center" theme={mode !== "ig" || dark ? "dark" : "light"} dir={g.lang === "ar" ? "rtl" : "ltr"} />
     </div>
   );
 }
