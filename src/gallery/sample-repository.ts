@@ -6,10 +6,21 @@ import type { Comment, GalleryRepository, MediaItem, Post, Profile } from "./typ
 
 const VIDEO_BASE = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/";
 const img = (id: string, src: string, width: number, height: number): MediaItem => ({
-  id, kind: "image", src, width, height, source: "sample",
+  id,
+  kind: "image",
+  src,
+  width,
+  height,
+  source: "sample",
 });
 const vid = (id: string, file: string, poster: string): MediaItem => ({
-  id, kind: "video", src: `${VIDEO_BASE}${file}.mp4`, poster, width: 1280, height: 720, source: "sample",
+  id,
+  kind: "video",
+  src: `${VIDEO_BASE}${file}.mp4`,
+  poster,
+  width: 1280,
+  height: 720,
+  source: "sample",
 });
 
 const M = {
@@ -20,27 +31,105 @@ const M = {
 };
 
 const profiles: Profile[] = [
-  { id: "me", isMe: true, name: { en: "My Gallery", ar: "معرضي" }, handle: "my.gallery", avatar: d2,
-    bio: { en: "Personal offline gallery · demo data", ar: "معرض شخصي دون اتصال · بيانات تجريبية" }, baseFollowers: 0, followingCount: 3 },
-  { id: "coast", verified: true, name: { en: "Coastline Roll", ar: "شريط الساحل" }, handle: "coastline.roll", avatar: d1,
-    bio: { en: "Demo album · roads by the sea", ar: "ألبوم تجريبي · طرق بجانب البحر" }, baseFollowers: 1284, followingCount: 88 },
-  { id: "night", name: { en: "Night Walks", ar: "مشاوير الليل" }, handle: "nightwalks", avatar: d3,
-    bio: { en: "Demo album · neon and rain", ar: "ألبوم تجريبي · نيون ومطر" }, baseFollowers: 532, followingCount: 41 },
-  { id: "dunes", name: { en: "Dune Diary", ar: "يوميات الكثبان" }, handle: "dune.diary", avatar: d4,
-    bio: { en: "Demo album · quiet deserts", ar: "ألبوم تجريبي · صحاري هادئة" }, baseFollowers: 2210, followingCount: 120 },
+  {
+    id: "me",
+    isMe: true,
+    name: { en: "My Gallery", ar: "معرضي" },
+    handle: "my.gallery",
+    avatar: d2,
+    bio: { en: "Personal offline gallery · demo data", ar: "معرض شخصي دون اتصال · بيانات تجريبية" },
+    baseFollowers: 0,
+    followingCount: 3,
+  },
+  {
+    id: "coast",
+    verified: true,
+    name: { en: "Coastline Roll", ar: "شريط الساحل" },
+    handle: "coastline.roll",
+    avatar: d1,
+    bio: { en: "Demo album · roads by the sea", ar: "ألبوم تجريبي · طرق بجانب البحر" },
+    baseFollowers: 1284,
+    followingCount: 88,
+  },
+  {
+    id: "night",
+    name: { en: "Night Walks", ar: "مشاوير الليل" },
+    handle: "nightwalks",
+    avatar: d3,
+    bio: { en: "Demo album · neon and rain", ar: "ألبوم تجريبي · نيون ومطر" },
+    baseFollowers: 532,
+    followingCount: 41,
+  },
+  {
+    id: "dunes",
+    name: { en: "Dune Diary", ar: "يوميات الكثبان" },
+    handle: "dune.diary",
+    avatar: d4,
+    bio: { en: "Demo album · quiet deserts", ar: "ألبوم تجريبي · صحاري هادئة" },
+    baseFollowers: 2210,
+    followingCount: 120,
+  },
 ];
 
 const H = 3600_000;
 type Seed = [string, string, MediaItem[], string, string, number, number];
 const seeds: Seed[] = [
-  ["p1", "coast", [M.coast(), M.dunes()], "Golden hour on the cliff road 🌅", "الساعة الذهبية على طريق المنحدر 🌅", 1, 412],
+  [
+    "p1",
+    "coast",
+    [M.coast(), M.dunes()],
+    "Golden hour on the cliff road 🌅",
+    "الساعة الذهبية على طريق المنحدر 🌅",
+    1,
+    412,
+  ],
   ["p2", "me", [M.cafe()], "Slow morning, good notes ☕", "صباح هادئ وملاحظات جميلة ☕", 3, 58],
-  ["p3", "night", [vid("v1", "ForBiggerBlazes", d3)], "Sample clip · night mood", "مقطع تجريبي · أجواء ليلية", 5, 903],
-  ["p4", "dunes", [M.dunes()], "Footprints are temporary, sunrises are not", "الآثار مؤقتة، أما الشروق فلا", 8, 1530],
-  ["p5", "me", [M.neon(), M.coast(), M.cafe()], "A week in three frames", "أسبوع في ثلاث لقطات", 12, 77],
-  ["p6", "coast", [vid("v2", "ForBiggerEscapes", d1)], "Sample clip · escape plan", "مقطع تجريبي · خطة هروب", 20, 2204],
+  [
+    "p3",
+    "night",
+    [vid("v1", "ForBiggerBlazes", d3)],
+    "Sample clip · night mood",
+    "مقطع تجريبي · أجواء ليلية",
+    5,
+    903,
+  ],
+  [
+    "p4",
+    "dunes",
+    [M.dunes()],
+    "Footprints are temporary, sunrises are not",
+    "الآثار مؤقتة، أما الشروق فلا",
+    8,
+    1530,
+  ],
+  [
+    "p5",
+    "me",
+    [M.neon(), M.coast(), M.cafe()],
+    "A week in three frames",
+    "أسبوع في ثلاث لقطات",
+    12,
+    77,
+  ],
+  [
+    "p6",
+    "coast",
+    [vid("v2", "ForBiggerEscapes", d1)],
+    "Sample clip · escape plan",
+    "مقطع تجريبي · خطة هروب",
+    20,
+    2204,
+  ],
   ["p7", "night", [M.neon()], "Rain makes the city honest", "المطر يجعل المدينة صادقة", 26, 640],
-  ["p8", "me", [vid("v3", "ForBiggerJoyrides", d2)], "Sample clip · weekend ride", "مقطع تجريبي · رحلة نهاية الأسبوع", 40, 121],
+  [
+    "p8",
+    "me",
+    [vid("v3", "ForBiggerJoyrides", d2)],
+    "Sample clip · weekend ride",
+    "مقطع تجريبي · رحلة نهاية الأسبوع",
+    40,
+    121,
+  ],
   ["p9", "dunes", [M.dunes(), M.coast()], "From sand to sea", "من الرمل إلى البحر", 52, 988],
   ["p10", "me", [M.coast()], "Saved this view for later", "حفظت هذا المنظر لوقت لاحق", 70, 64],
 ];
@@ -66,17 +155,34 @@ export const sampleRepository: GalleryRepository = {
   getPosts: (): Post[] => {
     const now = Date.now();
     return seeds.map(([id, authorId, media, en, ar, hours, likes], i) => ({
-      id, authorId, media, caption: { en, ar }, createdAt: now - hours * H,
-      baseLikes: likes, baseReposts: Math.round(likes / 9), views: likes * 23 + i * 117,
+      id,
+      authorId,
+      media,
+      caption: { en, ar },
+      createdAt: now - hours * H,
+      baseLikes: likes,
+      baseReposts: Math.round(likes / 9),
+      views: likes * 23 + i * 117,
     }));
   },
   getSeedComments: (): Comment[] => {
     const now = Date.now();
     return commentSeeds.map(([id, postId, authorId, text, hours, parentId], i) => ({
-      id, postId, authorId, text, parentId, createdAt: now - hours * H, baseLikes: (i * 7) % 23,
+      id,
+      postId,
+      authorId,
+      text,
+      parentId,
+      createdAt: now - hours * H,
+      baseLikes: (i * 7) % 23,
     }));
   },
 };
 
 /** Media providers planned for later; shown honestly in Settings. */
-export const plannedRepositories = [{ id: "android-mediastore", label: { en: "Android device gallery (MediaStore)", ar: "معرض جهاز أندرويد (MediaStore)" } }];
+export const plannedRepositories = [
+  {
+    id: "android-mediastore",
+    label: { en: "Android device gallery (MediaStore)", ar: "معرض جهاز أندرويد (MediaStore)" },
+  },
+];

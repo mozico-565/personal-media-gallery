@@ -1,6 +1,16 @@
 # Personal Media Gallery
 
-Build a polished mobile-first interactive prototype named Social Gallery V1. This is a PERSONAL offline gallery concept, not a public social network. Create three visually highly faithful distinct UI modes inspired by Instagram, X/Twitter and TikTok, including recognizable platform-style branding and navigation for personal prototyping. Instagram: home feed, stories row, profile grid, reels, likes/comments modal; X: dark timeline, profile, threaded replies, repost and like; TikTok: fullscreen vertical video/photo swipe feed with overlay action rail and comments drawer. Include a persistent discreet platform switcher accessible in every mode. Populate with tasteful sample local/demo photos and videos, label demo data honestly. All interactive controls must work (navigation, likes, comments CRUD, save, profile, follow simulation, media navigation, mode switch), persist via localStorage; no fake external backend, no actual AI claims. Provide a clear AI personalities settings UI marked 'planned, not active' and manual/AI toggle disabled until implemented. Dark mode, Arabic RTL and English switch, responsive touch-first layouts, safe area padding, polished transitions, high fidelity platform-specific spacing and typography. Make architecture clean and reusable so future Android MediaStore integration can replace sample media. No login, no deployment, no external media upload. Prioritize realistic functional prototype over decorative landing page.
+Social Gallery V2 is a personal, local gallery with three independent browsing experiences:
+
+- Instagram: photos and photo albums, stories, explore, profile and saved photos.
+- TikTok: videos only, with vertical swipe, playback, audio and seeking controls.
+- X: private text notes with draft persistence, editing, deletion, replies, quotes and simulated reposts.
+
+Use the add button in Instagram or TikTok, or Settings, to choose device media. Files are copied into this browser's IndexedDB and never uploaded by the app. Notes and interactions stay in localStorage. Clearing site data removes local copies and notes. Hiding a photo does not delete the original file.
+
+This web app cannot scan the Android gallery automatically. MediaStore integration and AI personalities remain planned/inactive. Sample video clips require internet. Demo accounts and counts are simulations.
+
+See [V2 validation](docs/V2_VALIDATION.md) for test evidence and remaining verification.
 
 This project was built with [Lovable](https://lovable.dev).
 
