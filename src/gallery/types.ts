@@ -34,6 +34,7 @@ export type Post = {
   baseLikes: number;
   baseReposts: number;
   views: number;
+  quoteId?: string | undefined;
 };
 
 export type Comment = {
