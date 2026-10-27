@@ -1,3 +1,4 @@
+import { createLocalId } from "./local-id";
 import {
   createContext,
   useCallback,
@@ -131,7 +132,7 @@ function useGalleryApi(repo: GalleryRepository) {
           ),
         };
       const note: Post = {
-        id: crypto.randomUUID(),
+        id: createLocalId(),
         authorId: ME,
         media: [],
         caption: { en: text.trim(), ar: text.trim() },
@@ -171,7 +172,7 @@ function useGalleryApi(repo: GalleryRepository) {
   const addComment = useCallback((postId: string, text: string, parentId: string | null = null) => {
     if (!text.trim()) return;
     const c: Comment = {
-      id: crypto.randomUUID(),
+      id: createLocalId(),
       postId,
       authorId: ME,
       text: text.trim(),
