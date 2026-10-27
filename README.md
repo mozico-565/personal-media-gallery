@@ -1,34 +1,39 @@
-# Personal Media Gallery
+# Social Gallery
 
-Social Gallery V2 is a personal, local gallery with three independent browsing experiences:
+An independent, personal React + TypeScript + Vite website. Lovable provided the initial foundation; the project no longer needs its editor, build configuration, telemetry, or hosting. GitHub is the source of truth.
 
-- Instagram: photos and photo albums, stories, explore, profile and saved photos.
-- TikTok: videos only, with vertical swipe, playback, audio and seeking controls.
-- X: private text notes with draft persistence, editing, deletion, replies, quotes and simulated reposts.
+## Product roadmap
 
-Use the add button in Instagram or TikTok, or Settings, to choose device media. Files are copied into this browser's IndexedDB and never uploaded by the app. Notes and interactions stay in localStorage. Clearing site data removes local copies and notes. Hiding a photo does not delete the original file.
-
-This web app cannot scan the Android gallery automatically. MediaStore integration and AI personalities remain planned/inactive. Sample video clips require internet. Demo accounts and counts are simulations.
-
-See [V2 validation](docs/V2_VALIDATION.md) for test evidence and remaining verification.
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/86693adb-58ea-4289-ba0a-21b3e6b99b69).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+1. **Current: website.** Refine Instagram photos, TikTok videos and X text notes; test mobile layouts, Arabic/RTL, motion, storage and all interactions.
+2. **After web acceptance: Android.** Package the stable web UI (for example with Capacitor), add native MediaStore access and Android permissions, and build/test APK releases. Native work has not started.
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Requires Node.js 24 and npm.
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+npm ci
 npm run dev
 ```
+
+```sh
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm run preview
+```
+
+The self-contained static build is `dist/`. Serve it using an HTTPS static host with single-page-app fallback to `index.html`. There is no SSR server or Lovable runtime. The existing TanStack Router and all gallery components are retained.
+
+## Data and privacy
+
+- Instagram shows photos/albums; TikTok shows videos; X shows private text notes.
+- Import device media with the add buttons or Settings. Media is stored in IndexedDB on this browser, never uploaded by the app. Notes, drafts and reactions use localStorage.
+- Browser storage is tied to the website origin. Data on the old Lovable domain does not automatically appear on a new domain. Keep the old origin until important content has been copied; original phone media can be selected again.
+- Clearing site data removes locally stored notes and imported copies. Hiding a photo never deletes the original device file.
+- Android automatic gallery discovery and real AI personalities remain unimplemented. Demo clips and Google Fonts need internet; this version does not claim full offline loading.
+
+## Validation
+
+The existing V2 behavior suite contains 12 passing tests. See `docs/V2_VALIDATION.md` for its scope and physical-device checks still needed. Current standalone build, type checking and tests pass; a live visual review is still required.
