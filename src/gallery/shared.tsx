@@ -24,10 +24,6 @@ export function DemoChip({ className }: { className?: string }) {
   return <span className={cn("rounded-sm bg-overlay px-1.5 py-0.5 text-[10px] font-semibold tracking-wider text-media-foreground", className)}>{t("demo")}</span>;
 }
 
-export function share() {
-  toast(useGalleryShareMsg.current);
-}
-export const useGalleryShareMsg = { current: "Share simulated" };
 
 export function BottomSheet({ open, onClose, title, children, className }: {
   open: boolean; onClose: () => void; title?: ReactNode; children: ReactNode; className?: string;
