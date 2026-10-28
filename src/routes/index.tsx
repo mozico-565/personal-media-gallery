@@ -6,6 +6,7 @@ import { GalleryProvider, useGallery } from "@/gallery/store";
 import { PlatformSwitcher } from "@/gallery/switcher";
 import { TikTokMode } from "@/gallery/tiktok";
 import { XMode } from "@/gallery/x";
+import { xAccentStyle } from "@/gallery/x-accent";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -44,6 +45,7 @@ function Phone() {
   return (
     <div
       data-mode={mode}
+      style={xAccentStyle(g.state.xAccent)}
       className={cn(
         "phone-frame relative overflow-hidden bg-background text-foreground",
         (mode !== "ig" || dark) && "dark",
