@@ -1,18 +1,19 @@
 import { MediaImport } from "./media-import";
 import { useState } from "react";
-import { ArrowLeft, Home, Play, Plus, Search, User, Users, Mail } from "lucide-react";
+import { ArrowLeft, Home, Play, Plus, Search, User, Users, MessageSquare, Tv } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fmtCount } from "./i18n";
 import { ME, useGallery } from "./store";
 import { Avatar, BottomSheet, CommentsPanel, FollowButton, VerticalFeed } from "./shared";
 
-type Tab = "home" | "friends" | "profile";
+type Tab = "home" | "friends" | "search" | "profile";
 
 export function TikTokMode() {
   const g = useGallery();
   const [tab, setTab] = useState<Tab>("home");
-  const [feed, setFeed] = useState<"following" | "for">("for");
+  const [feed, setFeed] = useState<"following" | "for" | "saved">("for");
+  const [query, setQuery] = useState("");
   const [comments, setComments] = useState<string | null>(null);
   const [profileId, setProfileId] = useState(ME);
   const [start, setStart] = useState<{ ids: string[]; i: number } | null>(null);
@@ -27,8 +28,18 @@ export function TikTokMode() {
     setTab(t);
   };
   const followed = g.videoPosts.filter((p) => g.state.following[p.authorId]);
-  const homePosts = feed === "for" ? g.videoPosts : followed;
-  const showFeed = tab === "home" || tab === "friends" || start;
+  const homePosts =
+    feed === "saved"
+      ? g.videoPosts.filter((p) => g.state.saved[p.id])
+      : feed === "for"
+        ? g.videoPosts
+        : followed;
+  const searchPosts = g.videoPosts.filter((p) =>
+    `${p.caption[g.lang]} ${g.profile(p.authorId).handle}`
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  );
+  const showFeed = tab === "home" || tab === "friends" || tab === "search" || start;
 
   return (
     <div className="tt-type flex h-full flex-col bg-background text-foreground">
@@ -43,9 +54,11 @@ export function TikTokMode() {
               posts={
                 start
                   ? start.ids.map((id) => g.videoPosts.find((p) => p.id === id)!)
-                  : tab === "friends"
-                    ? followed
-                    : homePosts
+                  : tab === "search"
+                    ? searchPosts
+                    : tab === "friends"
+                      ? followed
+                      : homePosts
               }
               initialIndex={start?.i ?? 0}
               onComments={setComments}
@@ -60,41 +73,70 @@ export function TikTokMode() {
                 <ArrowLeft className="size-7 rtl:rotate-180" />
               </button>
             ) : tab === "home" ? (
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-center justify-center gap-5 pt-[calc(env(safe-area-inset-top)+10px)] text-[17px] font-semibold text-media-foreground drop-shadow-media">
-                {(["following", "for"] as const).map((f) => (
-                  <button
-                    key={f}
-                    onClick={() => setFeed(f)}
-                    className={cn(
-                      "pointer-events-auto relative pb-1.5",
-                      feed === f
-                        ? "opacity-100 after:absolute after:inset-x-1/4 after:bottom-0 after:h-[3px] after:rounded-full after:bg-media-foreground"
-                        : "opacity-60",
-                    )}
-                  >
-                    {f === "for" ? g.t("forYou") : g.t("followingTab")}
-                  </button>
-                ))}
+              <div className="tt-header absolute inset-x-0 top-0 z-10 text-media-foreground drop-shadow-media pt-safe">
                 <button
-                  onClick={() => go("friends")}
-                  className="pointer-events-auto absolute end-4"
-                  aria-label={g.t("search")}
+                  aria-label="LIVE"
+                  onClick={() =>
+                    toast(
+                      g.lang === "ar"
+                        ? "البث المباشر غير متاح في المعرض المحلي"
+                        : "Live streaming is unavailable in this local gallery",
+                    )
+                  }
+                  className="tt-live"
                 >
-                  <Search className="size-6" />
+                  <Tv className="size-[27px]" />
+                  <span>LIVE</span>
+                </button>
+                <div className="tt-tabs">
+                  {(["saved", "following", "for"] as const).map((f) => (
+                    <button
+                      key={f}
+                      aria-pressed={feed === f}
+                      onClick={() => setFeed(f)}
+                      className={cn("tt-feed-tab", feed === f && "selected")}
+                    >
+                      {f === "for"
+                        ? g.t("forYou")
+                        : f === "following"
+                          ? g.lang === "ar"
+                            ? "أتابعه"
+                            : "Following"
+                          : g.t("saved")}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => go("search")}
+                  aria-label={g.t("search")}
+                  className="tt-search"
+                >
+                  <Search className="size-[27px]" />
                 </button>
               </div>
-            ) : (
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-10 pt-[calc(env(safe-area-inset-top)+10px)] text-center text-[17px] font-semibold text-media-foreground drop-shadow-media">
+            ) : tab === "friends" ? (
+              <div className="absolute inset-x-0 top-0 z-10 p-4 text-center font-semibold text-white">
                 {g.t("friends")}
               </div>
+            ) : (
+              <div className="absolute inset-x-0 top-0 z-10 flex items-center gap-3 bg-black/85 p-3 pt-safe text-white">
+                <button aria-label={g.t("home")} onClick={() => go("home")}>
+                  <ArrowLeft className="size-6 rtl:rotate-180" />
+                </button>
+                <input
+                  aria-label={g.t("search")}
+                  placeholder={g.t("searchPlaceholder")}
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  className="min-w-0 flex-1 rounded-lg bg-white/15 px-3 py-2 text-sm"
+                />
+              </div>
             )}
-            {((tab === "home" && feed === "following") || tab === "friends") &&
-              !start &&
-              followed.length === 0 && (
-                <div className="absolute inset-0 flex items-center justify-center p-10 text-center text-muted-foreground">
-                  {g.t("emptyFollowing")}
-                </div>
-              )}
+            {tab === "home" && feed === "following" && !start && followed.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center p-10 text-center text-muted-foreground">
+                {g.t("emptyFollowing")}
+              </div>
+            )}
           </>
         )}
         {tab === "profile" && !start && (
@@ -107,19 +149,26 @@ export function TikTokMode() {
       </main>
       <nav
         className={cn(
-          "shrink-0 pb-safe",
+          "tt-nav shrink-0 pb-safe",
           showFeed ? "bg-media text-media-foreground" : "border-t border-border bg-background",
         )}
         data-surface={showFeed ? "media" : undefined}
       >
-        <div className="flex h-[50px] items-center justify-around text-[10px] font-medium">
-          <TTNav on={tab === "home"} onClick={() => go("home")} label={g.t("home")}>
-            <Home className={cn("size-6", tab === "home" && "fill-current")} />
+        <div className="flex h-[52px] items-center justify-around text-[11px] font-medium">
+          <TTNav
+            on={tab === "home"}
+            onClick={() => go("home")}
+            label={g.lang === "ar" ? "الصفحة الرئيسية" : g.t("home")}
+          >
+            <Home className={cn("size-[27px]", tab === "home" && "fill-current")} />
           </TTNav>
           <TTNav on={tab === "friends"} onClick={() => go("friends")} label={g.t("friends")}>
-            <Users className={cn("size-6", tab === "friends" && "fill-current")} />
+            <Users className={cn("size-[27px]", tab === "friends" && "fill-current")} />
           </TTNav>
-          <MediaImport kind="video" className="relative flex h-8 w-11 items-center justify-center">
+          <MediaImport
+            kind="video"
+            className="tt-add relative flex h-[31px] w-[49px] items-center justify-center"
+          >
             <span className="absolute inset-y-0 start-0 w-9 rounded-lg bg-tt-cyan" />
             <span className="absolute inset-y-0 end-0 w-9 rounded-lg bg-primary" />
             <span
@@ -131,11 +180,24 @@ export function TikTokMode() {
               <Plus className="size-5" strokeWidth={3} />
             </span>
           </MediaImport>
-          <TTNav onClick={() => toast(g.t("shareSimulated"))} label={g.t("inbox")}>
-            <Mail className="size-6" />
+          <TTNav
+            onClick={() =>
+              toast(
+                g.lang === "ar"
+                  ? "الوارد غير متاح في المعرض المحلي"
+                  : "Inbox is unavailable in this local gallery",
+              )
+            }
+            label={g.lang === "ar" ? "صندوق الوارد" : g.t("inbox")}
+          >
+            <MessageSquare className="size-[27px]" />
           </TTNav>
-          <TTNav on={tab === "profile"} onClick={() => go("profile")} label={g.t("profile")}>
-            <User className={cn("size-6", tab === "profile" && "fill-current")} />
+          <TTNav
+            on={tab === "profile"}
+            onClick={() => go("profile")}
+            label={g.lang === "ar" ? "الملف الشخصي" : g.t("profile")}
+          >
+            <User className={cn("size-[27px]", tab === "profile" && "fill-current")} />
           </TTNav>
         </div>
       </nav>
@@ -169,9 +231,11 @@ function TTNav({
   return (
     <button
       onClick={onClick}
+      aria-label={label}
+      aria-current={on ? "page" : undefined}
       className={cn(
         "flex flex-1 flex-col items-center gap-0.5 active:scale-90",
-        !on && "opacity-70",
+        !on && "opacity-90",
       )}
     >
       {children}
@@ -256,6 +320,7 @@ function TTProfile({
         {posts.map((x, i) => (
           <button
             key={x.id}
+            aria-label={x.caption[g.lang]}
             onClick={() =>
               onOpen(
                 posts.map((q) => q.id),

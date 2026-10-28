@@ -13,6 +13,7 @@ import { translate, type TKey } from "./i18n";
 import { readLocalMedia, saveLocalMedia } from "./local-media";
 import { deleteNoteMedia } from "./note-media";
 import { sampleRepository } from "./sample-repository";
+import { DEFAULT_X_ACCENT, validAccent } from "./x-accent";
 import type {
   Comment,
   GalleryRepository,
@@ -34,6 +35,7 @@ export type GalleryState = {
   mode: Mode;
   lang: Lang;
   dark: boolean;
+  xAccent: string;
   liked: Flags;
   saved: Flags;
   reposted: Flags;
@@ -50,6 +52,7 @@ const defaults = (repo: GalleryRepository): GalleryState => ({
   mode: "ig",
   lang: "en",
   dark: false,
+  xAccent: DEFAULT_X_ACCENT,
   liked: {},
   saved: {},
   reposted: {},
@@ -85,6 +88,7 @@ function load(repo: GalleryRepository): GalleryState {
       if (!Array.isArray(merged.comments)) merged.comments = base.comments;
       if (!Array.isArray(merged.notes)) merged.notes = [];
       if (typeof merged.draft !== "string") merged.draft = "";
+      if (!validAccent(merged.xAccent)) merged.xAccent = DEFAULT_X_ACCENT;
       if (!["ig", "tt", "x"].includes(merged.mode)) merged.mode = base.mode;
       if (!["en", "ar"].includes(merged.lang)) merged.lang = base.lang;
       return merged;
@@ -234,7 +238,14 @@ function useGalleryApi(repo: GalleryRepository) {
     [],
   );
   const reset = useCallback(
-    () => setState((s) => ({ ...defaults(repo), mode: s.mode, lang: s.lang, dark: s.dark })),
+    () =>
+      setState((s) => ({
+        ...defaults(repo),
+        mode: s.mode,
+        lang: s.lang,
+        dark: s.dark,
+        xAccent: s.xAccent,
+      })),
     [repo],
   );
 

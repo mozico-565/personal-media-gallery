@@ -14,7 +14,10 @@ import {
   Search,
   Share,
   Trash2,
-  User,
+  Bell,
+  Compass,
+  SquarePen,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -24,6 +27,7 @@ import { Avatar, BottomSheet, FollowButton, Verified } from "./shared";
 import { NoteAttachment } from "./note-attachment";
 import { deleteNoteMedia, saveNoteMedia, storageMessage, validateNoteMedia } from "./note-media";
 import type { NoteAttachment as Attachment, Comment, Post } from "./types";
+import { xAccentStyle } from "./x-accent";
 
 export function XLogo({ className }: { className?: string }) {
   return (
@@ -33,13 +37,13 @@ export function XLogo({ className }: { className?: string }) {
   );
 }
 
-type Tab = "home" | "search" | "bookmarks" | "profile";
+type Tab = "home" | "search" | "bookmarks" | "profile" | "activity";
 
 export function XMode() {
   const g = useGallery();
   const [composing, setComposing] = useState(false);
   const [tab, setTab] = useState<Tab>("home");
-  const [feed, setFeed] = useState<"for" | "following">("for");
+  const [feed, setFeed] = useState<"for" | "following" | "media" | "text">("for");
   const [thread, setThread] = useState<string | null>(null);
   const [profileId, setProfileId] = useState(ME);
   const openProfile = (id: string) => {
@@ -55,10 +59,19 @@ export function XMode() {
   const posts =
     feed === "for"
       ? g.notes
-      : g.notes.filter((p) => g.state.following[p.authorId] || p.authorId === ME);
+      : g.notes.filter((p) =>
+          feed === "media"
+            ? !!p.attachment
+            : feed === "text"
+              ? !p.attachment
+              : g.state.following[p.authorId] || p.authorId === ME,
+        );
 
   return (
-    <div className="x-type flex h-full flex-col bg-background text-foreground">
+    <div
+      className="x-type flex h-full flex-col bg-background text-foreground"
+      style={xAccentStyle(g.state.xAccent)}
+    >
       <main
         key={tab + profileId + (thread ?? "")}
         className="relative min-h-0 flex-1 overflow-y-auto no-scrollbar animate-in fade-in duration-200"
@@ -70,33 +83,52 @@ export function XMode() {
             {tab === "home" && (
               <>
                 <header className="sticky top-0 z-10 border-b border-border bg-background/85 pt-safe backdrop-blur-md">
-                  <div className="relative flex h-[53px] items-center justify-center px-4">
-                    <button className="absolute start-4" onClick={() => go("profile")}>
+                  <div className="x-home-header relative flex items-center justify-center px-4">
+                    <button
+                      aria-label={g.t("profile")}
+                      className="absolute start-4"
+                      onClick={() => go("profile")}
+                    >
                       <Avatar p={g.profile(ME)} size={32} />
                     </button>
-                    <XLogo className="size-[26px]" />
+                    <XLogo className="size-[25px]" />
+                    <button
+                      className="x-header-tools absolute end-4"
+                      onClick={() => go("bookmarks")}
+                    >
+                      {g.t("saved")}
+                    </button>
                   </div>
-                  <div className="flex">
-                    {(["for", "following"] as const).map((f) => (
+                  <div className="x-feed-tabs">
+                    {(["for", "following", "media", "text"] as const).map((f) => (
                       <button
                         key={f}
+                        aria-pressed={feed === f}
                         onClick={() => setFeed(f)}
-                        className={cn(
-                          "flex flex-1 justify-center text-[15px]",
-                          feed === f ? "font-bold" : "font-medium text-muted-foreground",
-                        )}
+                        className={cn("x-feed-tab", feed === f && "selected")}
                       >
-                        <span
-                          className={cn(
-                            "relative py-3.5",
-                            feed === f &&
-                              "after:absolute after:inset-x-0 after:bottom-0 after:h-1 after:rounded-full after:bg-primary",
-                          )}
-                        >
-                          {f === "for" ? g.t("forYou") : g.t("followingTab")}
-                        </span>
+                        {f === "for"
+                          ? g.t("forYou")
+                          : f === "following"
+                            ? g.lang === "ar"
+                              ? "متابع"
+                              : "Following"
+                            : f === "media"
+                              ? g.lang === "ar"
+                                ? "بمرفقات"
+                                : "Media"
+                              : g.lang === "ar"
+                                ? "نصوص"
+                                : "Text"}
                       </button>
                     ))}
+                    <button
+                      aria-label={g.lang === "ar" ? "ملاحظة جديدة" : "New note"}
+                      onClick={() => setComposing(true)}
+                      className="x-add-tab"
+                    >
+                      <Plus className="size-5" />
+                    </button>
                   </div>
                 </header>
                 {posts.length === 0 && (
@@ -117,6 +149,28 @@ export function XMode() {
               </>
             )}
             {tab === "search" && <XSearch onOpen={setThread} onProfile={openProfile} />}
+            {tab === "activity" && (
+              <>
+                <XHeader title={g.lang === "ar" ? "تفاعلاتي المحلية" : "My local activity"} />
+                {g.notes
+                  .filter((p) => g.state.liked[p.id] || g.state.reposted[p.id])
+                  .map((p) => (
+                    <Tweet
+                      key={p.id}
+                      post={p}
+                      onOpen={() => setThread(p.id)}
+                      onProfile={openProfile}
+                    />
+                  ))}
+                {!g.notes.some((p) => g.state.liked[p.id] || g.state.reposted[p.id]) && (
+                  <p className="p-8 text-center text-muted-foreground">
+                    {g.lang === "ar"
+                      ? "ستظهر هنا الملاحظات التي تفاعلت معها على هذا الجهاز"
+                      : "Notes you react to on this device appear here"}
+                  </p>
+                )}
+              </>
+            )}
             {tab === "bookmarks" && (
               <>
                 <XHeader title={g.t("bookmarks")} />
@@ -145,41 +199,56 @@ export function XMode() {
             )}
           </>
         )}
-        {!thread && tab === "home" && (
-          <button
-            onClick={() => setComposing(true)}
-            aria-label="compose"
-            className="sticky bottom-4 float-end me-4 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-fab active:scale-95"
-          >
-            <Pencil className="size-6" />
-          </button>
-        )}
       </main>
+      {!thread && tab === "home" && (
+        <button
+          onClick={() => setComposing(true)}
+          aria-label="compose"
+          className="x-compose absolute z-20 flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-fab active:scale-95"
+        >
+          <SquarePen className="size-[25px]" />
+        </button>
+      )}
       <NoteComposer open={composing} onClose={() => setComposing(false)} />
-      <nav className="shrink-0 border-t border-border bg-background pb-safe">
+      <nav className="x-nav shrink-0 border-t border-border bg-background pb-safe">
         <div className="flex h-[53px] items-center justify-around">
           {(
             [
               ["home", Home],
               ["search", Search],
-              ["bookmarks", Bookmark],
-              ["profile", User],
+              ["bookmarks", Compass],
+              ["activity", Bell],
             ] as const
           ).map(([k, I]) => (
             <button
               key={k}
               onClick={() => go(k)}
-              aria-label={k}
+              aria-label={
+                k === "activity" ? (g.lang === "ar" ? "تفاعلاتي" : "My activity") : g.t(k)
+              }
               className="flex flex-1 justify-center py-3 active:scale-90"
             >
               <I
                 className={cn(
-                  "size-[26px]",
+                  "size-[27px]",
                   tab === k && !thread && (k === "search" ? "stroke-[3]" : "fill-current"),
                 )}
               />
             </button>
           ))}
+          <button
+            aria-label={g.lang === "ar" ? "الرسائل — غير متاحة" : "Messages — unavailable"}
+            onClick={() =>
+              toast(
+                g.lang === "ar"
+                  ? "الرسائل غير متاحة في المعرض المحلي"
+                  : "Messages are unavailable in this local gallery",
+              )
+            }
+            className="flex flex-1 justify-center py-3"
+          >
+            <MessageCircle className="size-[27px]" />
+          </button>
         </div>
       </nav>
     </div>
@@ -209,12 +278,13 @@ function Actions({ post, onReply, big }: { post: Post; onReply: () => void; big?
   const liked = !!g.state.liked[post.id],
     rp = !!g.state.reposted[post.id],
     sv = !!g.state.saved[post.id];
-  const sz = big ? "size-[22px]" : "size-[18.75px]";
-  const btn = "group flex items-center gap-1 text-[13px] text-muted-foreground transition-colors";
+  const sz = big ? "size-[22px]" : "size-[18px]";
+  const btn =
+    "x-action group flex items-center gap-1 text-[12px] text-muted-foreground transition-colors";
   return (
     <div
       className={cn(
-        "flex items-center justify-between",
+        "x-actions flex items-center justify-between",
         big ? "border-y border-border px-2 py-3" : "mt-3 max-w-[425px]",
       )}
     >
@@ -261,18 +331,20 @@ function Actions({ post, onReply, big }: { post: Post; onReply: () => void; big?
         </span>
       )}
       <span className="flex items-center gap-3">
-        <button
-          aria-label={g.t("save")}
-          aria-pressed={sv}
-          onClick={(e) => {
-            e.stopPropagation();
-            g.toggle("saved", post.id);
-          }}
-          data-active={sv}
-          className={cn(btn, "reaction reaction-save", sv && "text-primary")}
-        >
-          <Bookmark className={cn(sz, sv && "fill-current")} />
-        </button>
+        {big && (
+          <button
+            aria-label={g.t("save")}
+            aria-pressed={sv}
+            onClick={(e) => {
+              e.stopPropagation();
+              g.toggle("saved", post.id);
+            }}
+            data-active={sv}
+            className={cn(btn, "reaction reaction-save", sv && "text-primary")}
+          >
+            <Bookmark className={cn(sz, sv && "fill-current")} />
+          </button>
+        )}
         <button
           aria-label={g.lang === "ar" ? "مشاركة" : "Share"}
           onClick={(e) => {
@@ -299,10 +371,13 @@ function Tweet({
 }) {
   const g = useGallery();
   const a = g.profile(post.authorId);
+  const [expanded, setExpanded] = useState(false);
+  const text = post.caption[g.lang];
+  const long = text.length > 280 || text.split("\n").length > 10;
   return (
     <article
       onClick={onOpen}
-      className="note-card relative cursor-pointer border-b border-border px-4 py-3 transition-colors active:bg-muted/40"
+      className="note-card relative cursor-pointer border-b border-border px-4 py-2.5 transition-colors active:bg-muted/40"
     >
       {g.state.reposted[post.id] && (
         <div className="mb-1 flex items-center gap-2 ps-8 text-[13px] font-bold text-muted-foreground">
@@ -310,7 +385,7 @@ function Tweet({
           {g.lang === "ar" ? "أعدت النشر" : "You reposted"}
         </div>
       )}
-      <div className="flex gap-3">
+      <div className="note-layout flex gap-2">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -321,16 +396,43 @@ function Tweet({
           <Avatar p={a} size={40} />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1 text-[15px] leading-5">
+          <div className="note-author flex items-center gap-1 text-[15px] leading-5">
             <span className="truncate font-bold">{a.name[g.lang]}</span>
             {a.verified && <Verified />}
-            <span dir="ltr" className="truncate text-muted-foreground">
-              @{a.handle} · {timeAgo(post.createdAt, g.lang)}
+            <bdi dir="ltr" className="note-handle truncate text-muted-foreground">
+              @{a.handle}
+            </bdi>
+            <span className="shrink-0 text-muted-foreground">
+              · {timeAgo(post.createdAt, g.lang)}
             </span>
           </div>
-          <p dir="auto" className="whitespace-pre-wrap break-words text-[15px] leading-5">
-            {post.caption[g.lang]}
+          <p
+            dir="auto"
+            className={cn(
+              "note-text whitespace-pre-wrap break-words text-[16px] leading-[21px]",
+              long && !expanded && "note-collapsed",
+            )}
+          >
+            {text}
           </p>
+          {long && (
+            <button
+              aria-expanded={expanded}
+              className="note-more text-[15px] text-primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded((v) => !v);
+              }}
+            >
+              {g.lang === "ar"
+                ? expanded
+                  ? "عرض أقل"
+                  : "عرض المزيد"
+                : expanded
+                  ? "Show less"
+                  : "Show more"}
+            </button>
+          )}
           {post.attachment && <NoteAttachment attachment={post.attachment} />}
           <NoteTools post={post} />
 
@@ -836,9 +938,19 @@ export function NoteComposer({
               {file ? (
                 <div className="note-attachment">
                   {file.type.startsWith("image/") ? (
-                    <img src={preview} alt={file.name} className="max-h-64 w-full object-contain" />
+                    <img
+                      src={preview || undefined}
+                      alt={file.name}
+                      className="max-h-64 w-full object-contain"
+                    />
                   ) : (
-                    <video src={preview} controls muted playsInline className="max-h-64 w-full" />
+                    <video
+                      src={preview || undefined}
+                      controls
+                      muted
+                      playsInline
+                      className="max-h-64 w-full"
+                    />
                   )}
                 </div>
               ) : (
@@ -939,6 +1051,12 @@ function NoteTools({ post }: { post: Post }) {
         title={g.lang === "ar" ? "خيارات الملاحظة" : "Note options"}
       >
         <div className="flex flex-col gap-2 p-4 text-start text-sm font-semibold">
+          <button
+            aria-pressed={!!g.state.saved[post.id]}
+            onClick={() => g.toggle("saved", post.id)}
+          >
+            {g.state.saved[post.id] ? g.t("saved") : g.t("save")}
+          </button>
           <button
             onClick={() => {
               setTools(false);

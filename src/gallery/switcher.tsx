@@ -9,6 +9,7 @@ import { MediaImport } from "./media-import";
 import { BottomSheet } from "./shared";
 import type { Mode } from "./types";
 import { XLogo } from "./x";
+import { DEFAULT_X_ACCENT, accentForeground, validAccent } from "./x-accent";
 
 /** Discreet edge handle available in every mode. */
 export function PlatformSwitcher() {
@@ -179,16 +180,94 @@ const personalities = [
   },
 ];
 
+const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <section className="space-y-2">
+    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      {title}
+    </h3>
+    {children}
+  </section>
+);
+
+export function XAccentSettings() {
+  const g = useGallery();
+  const [hex, setHex] = useState(g.state.xAccent);
+  useEffect(() => setHex(g.state.xAccent), [g.state.xAccent]);
+  const colors = [DEFAULT_X_ACCENT, "#1d9bf0", "#8b5cf6", "#f91880", "#00ba7c", "#ffffff"];
+  return (
+    <Section title={g.lang === "ar" ? "لون واجهة X" : "X accent color"}>
+      <div className="rounded-xl border p-3 space-y-3">
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span>
+            {g.lang === "ar" ? "اختر أي لون" : "Choose any color"}
+            <span dir="ltr" className="block text-xs text-muted-foreground">
+              {g.state.xAccent.toUpperCase()}
+            </span>
+          </span>
+          <input
+            type="color"
+            aria-label={g.lang === "ar" ? "لون واجهة X" : "X accent color"}
+            value={g.state.xAccent}
+            onChange={(e) => g.set("xAccent", e.target.value)}
+            className="h-11 w-14 cursor-pointer rounded-md border bg-transparent p-1"
+          />
+        </label>
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span>{g.lang === "ar" ? "رمز اللون HEX" : "HEX color code"}</span>
+          <input
+            aria-label={g.lang === "ar" ? "رمز لون X" : "X HEX color"}
+            dir="ltr"
+            value={hex}
+            maxLength={7}
+            spellCheck={false}
+            aria-invalid={!validAccent(hex)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setHex(value);
+              if (validAccent(value)) g.set("xAccent", value.toLowerCase());
+            }}
+            className="h-11 w-28 rounded-md border bg-transparent px-2 font-mono text-sm"
+          />
+        </label>
+        {!validAccent(hex) && (
+          <p role="status" className="text-xs text-muted-foreground">
+            {g.lang === "ar"
+              ? "اكتب # وست خانات، مثل #7c3aed"
+              : "Use # and six hex digits, e.g. #7c3aed"}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {colors.map((color) => (
+            <button
+              key={color}
+              aria-label={`X ${color}`}
+              aria-pressed={g.state.xAccent.toLowerCase() === color}
+              onClick={() => g.set("xAccent", color)}
+              className="flex size-11 items-center justify-center rounded-lg border"
+              style={{ backgroundColor: color, color: accentForeground(color) }}
+            >
+              {g.state.xAccent.toLowerCase() === color && <Check className="size-5" />}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => g.set("xAccent", DEFAULT_X_ACCENT)}
+          className="text-sm underline underline-offset-4"
+        >
+          {g.lang === "ar" ? "استعادة البرتقالي" : "Restore orange"}
+        </button>
+        <p className="text-xs text-muted-foreground">
+          {g.lang === "ar"
+            ? "يُحفظ على هذا الجهاز ويغيّر لون الأزرار والمؤشر في X فقط."
+            : "Saved on this device. Changes X buttons and tab indicators only."}
+        </p>
+      </div>
+    </Section>
+  );
+}
+
 function SettingsBody() {
   const g = useGallery();
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
   return (
     <div className="flex-1 space-y-6 overflow-y-auto p-4 no-scrollbar">
       <Section title={g.t("language")}>
@@ -210,6 +289,7 @@ function SettingsBody() {
           <Switch checked={g.state.dark} onCheckedChange={(v) => g.set("dark", v)} />
         </label>
       </Section>
+      <XAccentSettings />
       <Section title={g.t("mediaSource")}>
         <div className="divide-y divide-border rounded-xl border border-border text-sm">
           <div className="flex items-center gap-2 px-4 py-3">

@@ -4,6 +4,7 @@ import {
   Bookmark,
   Heart,
   MessageCircle,
+  MessageCircleMore,
   Music2,
   Plus,
   Send,
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { fmtCount, timeAgo } from "./i18n";
 import { ME, useGallery } from "./store";
 import type { Comment, MediaItem, Post, Profile } from "./types";
+import { videoFit } from "./media-layout";
 
 export function Avatar({
   p,
@@ -404,14 +406,37 @@ export function MediaView({
   className,
   muted = true,
   paused,
+  smartFit = false,
 }: {
   m: MediaItem;
   active?: boolean;
   className?: string;
   muted?: boolean;
   paused?: boolean;
+  smartFit?: boolean;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
+  const box = useRef<HTMLDivElement>(null);
+  const [geometry, setGeometry] = useState({
+    width: m.width,
+    height: m.height,
+    boxWidth: 0,
+    boxHeight: 0,
+  });
+  useEffect(() => {
+    const el = box.current;
+    if (!smartFit || !el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry)
+        setGeometry((g) => ({
+          ...g,
+          boxWidth: entry.contentRect.width,
+          boxHeight: entry.contentRect.height,
+        }));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [smartFit, m.src]);
   const [error, setError] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -447,7 +472,7 @@ export function MediaView({
     );
   if (m.kind === "video")
     return (
-      <div className="relative h-full w-full">
+      <div ref={box} className="relative h-full w-full">
         <video
           ref={ref}
           src={m.src}
@@ -456,12 +481,28 @@ export function MediaView({
           loop
           playsInline
           preload={active ? "metadata" : "none"}
+          onLoadedMetadata={(e) => {
+            const { videoWidth: width, videoHeight: height } = e.currentTarget;
+            setGeometry((g) => ({ ...g, width, height }));
+          }}
           onError={() => setError(true)}
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             setProgress(v.duration ? (v.currentTime / v.duration) * 100 : 0);
           }}
           className={cn("h-full w-full object-cover", className)}
+          style={
+            smartFit
+              ? {
+                  objectFit: videoFit(
+                    geometry.width,
+                    geometry.height,
+                    geometry.boxWidth,
+                    geometry.boxHeight,
+                  ),
+                }
+              : undefined
+          }
         />
         {blocked && active && (
           <button
@@ -525,15 +566,20 @@ export function VerticalFeed({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [muted, setMuted] = useState(true);
+  const firstPostId = posts[0]?.id;
   useEffect(() => {
     const el = ref.current;
     if (el) el.scrollTop = initialIndex * el.clientHeight;
-  }, [initialIndex]);
+  }, [initialIndex, firstPostId]);
   return (
     <div
       ref={ref}
       className="h-full snap-y snap-mandatory overflow-y-scroll overscroll-contain no-scrollbar bg-media"
       data-surface="media"
+      tabIndex={0}
+      role="region"
+      aria-label={variant === "tt" ? "Video feed / الفيديوهات" : "Photo feed / الصور"}
+      style={{ overflowAnchor: "none" }}
     >
       {!posts.length && (
         <p
@@ -651,12 +697,12 @@ function Slide({
               active={active && i === idx}
               muted={muted}
               paused={paused}
-              className={variant === "tt" ? "object-contain" : ""}
+              smartFit={variant === "tt"}
             />
           </div>
         ))}
       </div>
-      <div className="pointer-events-none absolute inset-0 bg-media-scrim" />
+      {variant !== "tt" && <div className="pointer-events-none absolute inset-0 bg-media-scrim" />}
       {burst > 0 && (
         <Heart
           key={burst}
@@ -680,11 +726,16 @@ function Slide({
         </div>
       )}
 
-      <div className="absolute bottom-4 end-2 flex flex-col items-center gap-5">
+      <div
+        className={cn(
+          "video-rail absolute bottom-4 end-2 flex flex-col items-center gap-5",
+          variant === "tt" && "tt-rail",
+        )}
+      >
         {variant === "tt" && (
           <div className="relative mb-2">
             <button onClick={() => onProfile(author.id)}>
-              <Avatar p={author} size={48} className="border-2 border-media-foreground" />
+              <Avatar p={author} size={46} className="border border-media-foreground" />
             </button>
             {!author.isMe && !g.state.following[author.id] && (
               <button
@@ -715,10 +766,17 @@ function Slide({
           {fmtCount(g.likeCount(post), g.lang)}
         </button>
         <button className={railBtn} onClick={() => onComments(post.id)} aria-label="comments">
-          <MessageCircle
-            className={cn(iconCls, variant === "ig" && "-scale-x-100")}
-            strokeWidth={variant === "tt" ? 0 : 2}
-          />
+          {variant === "tt" ? (
+            <MessageCircleMore
+              className="size-8 fill-media-foreground text-black"
+              strokeWidth={1.8}
+            />
+          ) : (
+            <MessageCircle
+              className={cn(iconCls, variant === "ig" && "-scale-x-100")}
+              strokeWidth={2}
+            />
+          )}
           {fmtCount(g.commentsFor(post.id).length, g.lang)}
         </button>
         <button
@@ -743,23 +801,32 @@ function Slide({
           ) : (
             <Send className="size-7" />
           )}
+          {variant === "tt" && fmtCount(post.baseReposts, g.lang)}
         </button>
-        {hasVideo && (
+        {hasVideo && variant !== "tt" && (
           <button className={railBtn} onClick={() => setMuted(!muted)} aria-label="mute">
             {muted ? <VolumeX className="size-6" /> : <Volume2 className="size-6" />}
           </button>
         )}
-        <span
+        <button
+          onClick={() => setMuted(!muted)}
+          aria-label="mute"
+          title={muted ? "Unmute / تشغيل الصوت" : "Mute / كتم الصوت"}
           className={cn(
             "size-9 overflow-hidden border-[6px] border-media-foreground/20",
             variant === "tt" ? "animate-spin-slow rounded-full" : "rounded-md",
           )}
         >
           <img src={author.avatar} alt="" className="h-full w-full object-cover" />
-        </span>
+        </button>
       </div>
 
-      <div className="absolute bottom-4 start-3 end-20 space-y-1.5 text-[14.5px] drop-shadow-media">
+      <div
+        className={cn(
+          "video-caption absolute bottom-4 start-3 end-20 space-y-1.5 text-[14.5px] drop-shadow-media",
+          variant === "tt" && "tt-caption",
+        )}
+      >
         <div className="flex items-center gap-2">
           {variant === "ig" && (
             <button onClick={() => onProfile(author.id)}>
@@ -778,10 +845,17 @@ function Slide({
               {g.state.following[author.id] ? g.t("followingBtn") : g.t("follow")}
             </button>
           )}
-          <DemoChip />
+          {variant !== "tt" && <DemoChip />}
         </div>
-        <p className="line-clamp-2 leading-snug">{post.caption[g.lang]}</p>
-        <div className="flex items-center gap-1.5 text-[13px] opacity-90">
+        <p dir="auto" className="line-clamp-2 leading-snug">
+          {post.caption[g.lang]}
+        </p>
+        <div
+          className={cn(
+            "flex items-center gap-1.5 text-[13px] opacity-90",
+            variant === "tt" && "sr-only",
+          )}
+        >
           <Music2 className="size-3.5" />
           <span className="truncate">
             {author.handle} · {g.t("originalSound")}

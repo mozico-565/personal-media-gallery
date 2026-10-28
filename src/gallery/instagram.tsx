@@ -2,15 +2,16 @@ import { useEffect, useState, useRef } from "react";
 import {
   ArrowLeft,
   Bookmark,
-  ChevronDown,
   Clapperboard,
   Grid3x3,
   Heart,
   Home,
   Menu,
   MessageCircle,
-  MoreHorizontal,
-  PlusSquare,
+  Plus,
+  Repeat2,
+  SquarePlay,
+  ListFilter,
   Search,
   Send,
   X as Close,
@@ -60,17 +61,18 @@ export function InstagramMode() {
   return (
     <div className="ig-type flex h-full flex-col bg-background text-foreground">
       {tab === "home" && (
-        <header className="relative flex shrink-0 items-center justify-center px-4 pt-safe">
+        <header className="ig-header relative flex shrink-0 items-center justify-center px-4 pt-safe">
           <div className="flex h-[52px] items-center gap-1">
-            <span className="font-ig-logo text-[32px] leading-none">Instagram</span>
-            <ChevronDown className="mt-1 size-4" />
+            <span dir="ltr" className="ig-wordmark">
+              Instagram
+            </span>
           </div>
-          <div className="absolute inset-x-4 flex items-center justify-between">
+          <div dir="ltr" className="absolute inset-x-3 flex items-center justify-between">
             <button onClick={() => go("profile")} aria-label="likes">
-              <Heart className="size-6" />
+              <Heart className="size-[27px]" />
             </button>
             <MediaImport kind="image" className="flex size-9 items-center justify-center">
-              <PlusSquare className="size-6" />
+              <Plus className="size-[29px]" strokeWidth={1.8} />
             </MediaImport>
           </div>
         </header>
@@ -87,22 +89,21 @@ export function InstagramMode() {
       >
         {tab === "home" && (
           <>
-            <div className="flex gap-3.5 overflow-x-auto px-3 pb-2.5 pt-1 no-scrollbar">
+            <div className="ig-stories flex overflow-x-auto no-scrollbar">
               <StoryBubble label={g.t("yourStory")} onClick={() => toast(g.t("uploadDisabled"))}>
                 <span className="relative">
-                  <Avatar p={g.profile(ME)} size={74} />
-                  <span className="absolute bottom-0 end-0 flex size-6 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground text-base font-bold leading-none">
-                    +
+                  <Avatar p={g.profile(ME)} size={80} />
+                  <span className="absolute bottom-0 end-0 flex size-[23px] items-center justify-center rounded-full border-2 border-background bg-foreground text-background">
+                    <Plus className="size-4" strokeWidth={3} />
                   </span>
                 </span>
               </StoryBubble>
               {storyAuthors.map((p, i) => (
                 <StoryBubble key={p.id} label={p.handle} onClick={() => setStory(i)}>
-                  <Avatar p={p} size={78} ring seen={!!g.state.seenStories[p.id]} />
+                  <Avatar p={p} size={88} ring seen={!!g.state.seenStories[p.id]} />
                 </StoryBubble>
               ))}
             </div>
-            <div className="border-t border-border/60" />
             {g.photoPosts.map((p) => (
               <IGPost key={p.id} post={p} {...handlers} />
             ))}
@@ -144,19 +145,28 @@ export function InstagramMode() {
         )}
       </main>
 
-      <nav className="shrink-0 border-t border-border/60 bg-background pb-safe">
+      <nav className="ig-nav shrink-0 border-t border-border/60 bg-background pb-safe">
         <div className="flex h-[50px] items-center justify-around">
           <NavBtn on={tab === "home"} onClick={() => go("home")} label={g.t("home")}>
             <Home className={cn("size-[26px]", tab === "home" && "fill-current")} />
           </NavBtn>
+          <NavBtn on={tab === "saved"} onClick={() => go("saved")} label={g.t("saved")}>
+            <SquarePlay className="size-[26px]" strokeWidth={tab === "saved" ? 2.6 : 2} />
+          </NavBtn>
+          <NavBtn
+            onClick={() =>
+              toast(
+                g.lang === "ar"
+                  ? "الرسائل غير متاحة في المعرض المحلي"
+                  : "Messaging is unavailable in this local gallery",
+              )
+            }
+            label={g.lang === "ar" ? "الرسائل — غير متاحة" : "Messages — unavailable"}
+          >
+            <Send className="size-[26px]" />
+          </NavBtn>
           <NavBtn on={tab === "search"} onClick={() => go("search")} label={g.t("search")}>
             <Search className="size-[26px]" strokeWidth={tab === "search" ? 3 : 2} />
-          </NavBtn>
-          <MediaImport kind="image" className="flex flex-1 justify-center py-2">
-            <PlusSquare className="size-[26px]" />
-          </MediaImport>
-          <NavBtn on={tab === "saved"} onClick={() => go("saved")} label={g.t("saved")}>
-            <Bookmark className="size-[26px]" strokeWidth={tab === "saved" ? 2.6 : 2} />
           </NavBtn>
           <NavBtn on={tab === "profile"} onClick={() => go("profile")} label={g.t("profile")}>
             <Avatar
@@ -223,9 +233,12 @@ function StoryBubble({
   onClick: () => void;
 }) {
   return (
-    <button onClick={onClick} className="flex w-[80px] shrink-0 flex-col items-center gap-1">
+    <button
+      onClick={onClick}
+      className="ig-story flex shrink-0 flex-col items-center justify-end gap-1"
+    >
       {children}
-      <span className="w-full truncate text-center text-[12px]">{label}</span>
+      <span className="w-full truncate text-center text-[14px]">{label}</span>
     </button>
   );
 }
@@ -254,14 +267,10 @@ export function IGPost({
   const liked = !!g.state.liked[post.id];
   const saved = !!g.state.saved[post.id];
   const n = g.commentsFor(post.id).length;
-  const ratio =
-    post.media[0]!.kind === "video"
-      ? "aspect-[4/5]"
-      : post.media[0]!.height > post.media[0]!.width
-        ? "aspect-[4/5]"
-        : "aspect-square";
+  const first = post.media[0]!;
+  const ratio = `${first.width} / ${Math.min(first.height, (first.width * 4) / 3)}`;
   return (
-    <article className="pb-3">
+    <article className="ig-post pb-3">
       <BottomSheet
         open={actions}
         onClose={() => setActions(false)}
@@ -320,13 +329,13 @@ export function IGPost({
         </div>
       )}
 
-      <div className="flex h-[54px] items-center gap-2.5 px-3">
+      <div className="ig-post-header flex items-center gap-2.5 px-3">
         <button onClick={() => onProfile(a.id)}>
-          <Avatar p={a} size={32} ring={!a.isMe} seen={!!g.state.seenStories[a.id]} />
+          <Avatar p={a} size={36} />
         </button>
         <div className="flex-1 leading-tight">
           <button onClick={() => onProfile(a.id)} className="text-[14px] font-semibold">
-            {a.handle} {a.verified && <Verified />}
+            <bdi>{a.handle}</bdi> {a.verified && <Verified />}
           </button>
           <div className="text-[11.5px] text-muted-foreground">{g.t("demoData")}</div>
         </div>
@@ -342,12 +351,32 @@ export function IGPost({
           aria-label={g.lang === "ar" ? "خيارات الصورة" : "Photo options"}
           onClick={() => setActions(true)}
         >
-          <MoreHorizontal className="size-5" />
+          <ListFilter className="size-[22px]" />
         </button>
       </div>
-      <div className={cn("relative w-full bg-muted", ratio)}>
+      <div className="ig-media relative w-full bg-muted" style={{ aspectRatio: ratio }}>
         <div
           className="absolute inset-0 flex snap-x snap-mandatory overflow-x-auto no-scrollbar"
+          tabIndex={post.media.length > 1 ? 0 : undefined}
+          role="group"
+          aria-label={g.lang === "ar" ? "ألبوم الصور" : "Photo carousel"}
+          onKeyDown={(e) => {
+            if (post.media.length < 2 || !["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+            e.preventDefault();
+            const next = Math.max(
+              0,
+              Math.min(
+                post.media.length - 1,
+                idx + ((e.key === "ArrowLeft") === (g.lang === "ar") ? 1 : -1),
+              ),
+            );
+            e.currentTarget.scrollTo({
+              left: next * e.currentTarget.clientWidth * (g.lang === "ar" ? -1 : 1),
+              behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+                ? "auto"
+                : "smooth",
+            });
+          }}
           onScroll={(e) =>
             setIdx(Math.round(Math.abs(e.currentTarget.scrollLeft) / e.currentTarget.clientWidth))
           }
@@ -388,7 +417,6 @@ export function IGPost({
             {idx + 1}/{post.media.length}
           </span>
         )}
-        {post.media[0]!.source === "sample" && <DemoChip className="absolute start-3 top-3" />}
         {burst > 0 && (
           <Heart
             key={burst}
@@ -397,8 +425,24 @@ export function IGPost({
           />
         )}
       </div>
-      <div className="flex items-center px-3 pt-2.5">
-        <div className="flex flex-1 items-center gap-4">
+      {post.media.length > 1 && (
+        <div
+          className="ig-carousel-dots flex justify-center gap-1"
+          aria-label={`${idx + 1} / ${post.media.length}`}
+        >
+          {post.media.map((_, i) => (
+            <span
+              key={i}
+              className={cn(
+                "size-1.5 rounded-full",
+                i === idx ? "bg-ig-carousel" : "bg-muted-foreground/40",
+              )}
+            />
+          ))}
+        </div>
+      )}
+      <div className="ig-actions flex items-center px-3">
+        <div className="ig-action-group flex flex-1 items-center">
           <button
             onClick={() => g.toggle("liked", post.id)}
             aria-label="like"
@@ -407,9 +451,6 @@ export function IGPost({
             className="reaction reaction-like flex items-center gap-1"
           >
             <Heart className={cn("size-[26px]", liked && "fill-like text-like")} />
-            <span className="text-[12px] font-semibold tabular-nums">
-              {fmtCount(g.likeCount(post), g.lang)}
-            </span>
           </button>
           <button
             onClick={() => onComments(post.id)}
@@ -418,6 +459,17 @@ export function IGPost({
           >
             <MessageCircle className="size-[26px] -scale-x-100" />
             <span className="text-[12px] font-semibold tabular-nums">{fmtCount(n, g.lang)}</span>
+          </button>
+          <button
+            aria-label={g.t("reposts")}
+            aria-pressed={!!g.state.reposted[post.id]}
+            onClick={() => g.toggle("reposted", post.id)}
+            className={cn("flex items-center gap-1", g.state.reposted[post.id] && "text-repost")}
+          >
+            <Repeat2 className="size-[24px]" />
+            <span className="text-[13px] font-semibold tabular-nums">
+              {fmtCount(g.repostCount(post), g.lang)}
+            </span>
           </button>
           <button
             onClick={async () => {
@@ -437,24 +489,15 @@ export function IGPost({
               }
             }}
             aria-label="share"
+            className="flex items-center gap-1"
           >
             <Send className="size-[24px]" />
+            <span className="text-[13px] font-semibold tabular-nums">
+              {fmtCount(post.baseReposts, g.lang)}
+            </span>
           </button>
         </div>
-        {post.media.length > 1 && (
-          <div className="flex gap-1">
-            {post.media.map((_, i) => (
-              <span
-                key={i}
-                className={cn(
-                  "size-1.5 rounded-full",
-                  i === idx ? "bg-primary" : "bg-muted-foreground/40",
-                )}
-              />
-            ))}
-          </div>
-        )}
-        <div className="flex flex-1 justify-end">
+        <div className="ms-auto ps-2">
           <button
             onClick={() => g.toggle("saved", post.id)}
             aria-label="save"
@@ -466,7 +509,7 @@ export function IGPost({
           </button>
         </div>
       </div>
-      <div className="space-y-1 px-3 pt-2 text-[13.5px] leading-snug">
+      <div className="ig-caption space-y-1 px-3 text-[15px] leading-snug">
         <button onClick={() => onLikes(post.id)} className="font-semibold">
           {fmtCount(g.likeCount(post), g.lang)} {g.t("likes")}
         </button>
