@@ -2,7 +2,7 @@
 
 final result: blocked
 
-Source: user reference crops in docs/v3-bugfix/instagram-focused.jpg and docs/v3-bugfix/tiktok-focused.jpg. Rendered implementation: browser captures in the same files; 430 × 904 CSS px, density 1. Images are independently resized; supplied crops do not encode a matching viewport or theme. TikTok capture predates final navigation adjustment.
+Source: user reference crops in docs/bugfix-instagram-focused.jpg and docs/bugfix-tiktok-focused.jpg. Rendered implementation: browser captures in the same files; 430 × 904 CSS px, density 1. Images are independently resized; supplied crops do not encode a matching viewport or theme. TikTok capture predates final navigation adjustment.
 
 - P1: TikTok icon shapes and position need a same-viewport comparison with the reference; current comparison is not sufficient to establish fidelity.
 - P2: Instagram reference is dark and after capture is light, with different crops. Wordmark uses a geometric approximation; review it against a matching reference.
