@@ -1,4 +1,4 @@
-import { createFileRoute, useHydrated } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
 import { InstagramMode } from "@/gallery/instagram";
@@ -29,16 +29,11 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const hydrated = useHydrated();
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-stage">
-      {hydrated ? (
-        <GalleryProvider>
-          <Phone />
-        </GalleryProvider>
-      ) : (
-        <div className="phone-frame bg-media" />
-      )}
+      <GalleryProvider>
+        <Phone />
+      </GalleryProvider>
     </div>
   );
 }

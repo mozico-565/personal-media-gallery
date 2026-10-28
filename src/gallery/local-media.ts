@@ -1,3 +1,4 @@
+import { createLocalId } from "./local-id";
 import type { Post } from "./types";
 
 type Entry = { id: string; file: Blob; name: string; kind: "image" | "video"; createdAt: number };
@@ -47,7 +48,7 @@ export async function saveLocalMedia(files: File[]): Promise<Post[]> {
   if (files.some((f) => !/^(image|video)\//.test(f.type)))
     throw new Error("Choose images or videos / اختر صورًا أو فيديوهات");
   const entries: Entry[] = files.map((file) => ({
-    id: crypto.randomUUID(),
+    id: createLocalId(),
     file,
     name: file.name,
     kind: file.type.startsWith("image/") ? "image" : "video",
