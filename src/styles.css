@@ -187,7 +187,8 @@
   --primary-foreground: oklch(1 0 0);
   --sheet: oklch(1 0 0);
 }
-[data-mode="ig"].dark {
+[data-mode="ig"].dark,
+.dark [data-mode="ig"] {
   --background: oklch(0 0 0);
   --foreground: oklch(0.96 0 0);
   --muted: oklch(0.2 0 0);
@@ -370,5 +371,250 @@ article p {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* V3: reference-led motion, shared geometry, no ornamental particles. */
+.platform-label {
+  font-family: "IBM Plex Sans Arabic", Arial, sans-serif;
+  font-size: 17px;
+  line-height: 28px;
+  font-weight: 600;
+}
+.platform-label-ig {
+  font-weight: 500;
+}
+.platform-label-tt {
+  font-weight: 700;
+}
+.sheet-layer {
+  isolation: isolate;
+}
+.sheet-backdrop {
+  animation: sheet-fade-in 220ms ease-out both;
+  touch-action: none;
+}
+.sheet-panel {
+  animation: sheet-enter 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  overscroll-behavior: contain;
+}
+.sheet-layer[data-exiting="true"] .sheet-panel {
+  animation: sheet-leave 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.sheet-layer[data-exiting="true"] .sheet-backdrop {
+  animation: sheet-fade-out 180ms ease-in both;
+}
+.sheet-layer ~ [data-sonner-toaster] {
+  z-index: 60;
+}
+.phone-frame:has(> .sheet-layer) > div[data-mode],
+.phone-frame:has(> .sheet-layer) > button {
+  pointer-events: none;
+}
+.phone-frame:has(> .sheet-layer) main,
+.phone-frame:has(> .sheet-layer) [data-surface="media"] {
+  overflow-y: hidden;
+}
+.note-attachment {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: oklch(0 0 0);
+}
+.note-attachment img,
+.note-attachment video {
+  display: block;
+}
+.note-options {
+  position: absolute;
+  inset-inline-end: 8px;
+  top: 4px;
+  width: 36px;
+  color: var(--muted-foreground);
+}
+.note-card > .flex > div > div:first-child {
+  padding-inline-end: 20px;
+}
+.x-type {
+  font-family: Arial, "IBM Plex Sans Arabic", sans-serif;
+}
+[dir="rtl"] .x-type {
+  font-family: "IBM Plex Sans Arabic", Arial, sans-serif;
+}
+.x-type header {
+  backdrop-filter: none;
+  background: var(--background);
+}
+.x-type .reaction {
+  min-height: 32px;
+}
+.reaction {
+  touch-action: manipulation;
+}
+.reaction svg {
+  transition:
+    scale 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 120ms ease-out,
+    fill 120ms ease-out;
+  transform-origin: center;
+}
+.reaction:active svg {
+  scale: 0.82;
+}
+.reaction[data-active="true"] svg {
+  animation: reaction-on 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.reaction[data-active="false"] svg {
+  animation: reaction-off 160ms ease-out;
+}
+.x-type .reaction[data-active="true"] svg {
+  animation-duration: 220ms;
+}
+.x-type .reaction[data-active="false"] svg {
+  animation-duration: 140ms;
+}
+.tt-type .reaction-save[data-active="true"] {
+  color: var(--tt-gold);
+}
+.ig-burst {
+  color: oklch(0.65 0.25 345);
+  animation: ig-heart 800ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes reaction-on {
+  0% {
+    scale: 0.8;
+  }
+  45% {
+    scale: 1.18;
+  }
+  75% {
+    scale: 0.96;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes reaction-off {
+  0% {
+    scale: 0.85;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes ig-heart {
+  0% {
+    opacity: 0;
+    scale: 0.25;
+    rotate: -16deg;
+    color: oklch(0.77 0.2 55);
+  }
+  20% {
+    opacity: 1;
+    scale: 1.1;
+    rotate: -8deg;
+  }
+  45% {
+    scale: 1;
+    color: oklch(0.65 0.25 345);
+  }
+  75% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 0.9;
+    translate: 0 -18px;
+  }
+}
+@keyframes sheet-enter {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes sheet-leave {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reaction svg,
+  .ig-burst,
+  .sheet-panel,
+  .sheet-backdrop {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.note-card > .flex > button {
+  align-self: flex-start;
+}
+.ig-type nav {
+  border-top-width: 1px;
+}
+.ig-type article > div:first-of-type {
+  font-size: 14px;
+}
+.ig-type header {
+  min-height: 48px;
+}
+.tt-type .reaction {
+  position: relative;
+}
+.tt-type .reaction-save[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  top: -1px;
+  left: calc(50% - 17px);
+  border: 2px solid var(--tt-gold);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: tt-save-ring 440ms ease-out both;
+}
+@keyframes tt-save-ring {
+  0%,
+  30% {
+    opacity: 0;
+    scale: 0.7;
+  }
+  50% {
+    opacity: 0.9;
+    scale: 1.2;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tt-type .reaction-save::after {
+    display: none;
   }
 }
