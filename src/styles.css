@@ -640,21 +640,26 @@ article p {
 .ig-header {
   min-height: 52px;
 }
+@font-face {
+  font-family: GalleryGothic;
+  src: url("./assets/URWGothic-Book.otf") format("opentype");
+  font-display: swap;
+}
 .ig-wordmark {
-  font-family: Arial, sans-serif;
+  font-family: GalleryGothic, Arial, sans-serif;
   font-size: 27px;
   line-height: 1;
-  font-weight: 700;
+  font-weight: 400;
   letter-spacing: -1.5px;
 }
 .ig-stories {
   align-items: flex-end;
   gap: 10px;
   padding: 5px 12px 5px;
-  min-height: 120px;
+  min-height: 108px;
 }
 .ig-story {
-  width: 88px;
+  width: 78px;
 }
 .ig-story > span:first-child {
   margin-bottom: 1px;
@@ -986,4 +991,22 @@ article p {
 /* Keep the compose affordance visible even when its chosen accent is black. */
 .x-compose {
   border: 1px solid oklch(1 0 0 / 22%);
+}
+
+/* Keep the Arabic navigation labels within the screen. */
+.tt-rail .reaction > svg,
+.tt-rail > button[aria-label="comments"] > svg,
+.tt-rail > button[aria-label="share"] > svg {
+  width: 37px;
+  height: 37px;
+}
+.tt-nav > div {
+  padding-inline: 8px;
+}
+.tt-nav > div > button:not(.tt-add) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.tt-nav button > span {
+  font-size: clamp(9px, 2.6vw, 11px);
 }
