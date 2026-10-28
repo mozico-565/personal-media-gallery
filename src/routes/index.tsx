@@ -10,13 +10,13 @@ import { XMode } from "@/gallery/x";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Social Gallery V2 — personal offline gallery prototype" },
+      { title: "Social Gallery V3 — personal offline gallery prototype" },
       {
         name: "description",
         content:
           "Browse your personal gallery in Instagram, X and TikTok style views. Offline prototype with demo media.",
       },
-      { property: "og:title", content: "Social Gallery V2" },
+      { property: "og:title", content: "Social Gallery V3" },
       {
         property: "og:description",
         content: "A personal offline gallery prototype with three social-style views.",
