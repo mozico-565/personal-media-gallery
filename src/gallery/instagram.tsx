@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   ArrowLeft,
   Bookmark,
@@ -60,18 +60,18 @@ export function InstagramMode() {
   return (
     <div className="ig-type flex h-full flex-col bg-background text-foreground">
       {tab === "home" && (
-        <header className="flex shrink-0 items-center justify-between px-4 pt-safe">
+        <header className="relative flex shrink-0 items-center justify-center px-4 pt-safe">
           <div className="flex h-[52px] items-center gap-1">
-            <span className="font-ig-logo text-[30px] leading-none">Instagram</span>
+            <span className="font-ig-logo text-[32px] leading-none">Instagram</span>
             <ChevronDown className="mt-1 size-4" />
           </div>
-          <div className="flex items-center gap-5">
+          <div className="absolute inset-x-4 flex items-center justify-between">
             <button onClick={() => go("profile")} aria-label="likes">
               <Heart className="size-6" />
             </button>
-            <button onClick={() => toast(g.t("shareSimulated"))} aria-label="messages">
-              <Send className="size-6" />
-            </button>
+            <MediaImport kind="image" className="flex size-9 items-center justify-center">
+              <PlusSquare className="size-6" />
+            </MediaImport>
           </div>
         </header>
       )}
@@ -247,7 +247,10 @@ export function IGPost({
   const [fullscreen, setFullscreen] = useState(false);
   const [idx, setIdx] = useState(0);
   const [burst, setBurst] = useState(0);
-  const [lastTap, setLastTap] = useState(0);
+  const lastTap = useRef(0);
+  const touchStart = useRef({ x: 0, y: 0 });
+  const moved = useRef(false);
+  const [burstPoint, setBurstPoint] = useState({ x: 50, y: 50 });
   const liked = !!g.state.liked[post.id];
   const saved = !!g.state.saved[post.id];
   const n = g.commentsFor(post.id).length;
@@ -322,7 +325,7 @@ export function IGPost({
           <Avatar p={a} size={32} ring={!a.isMe} seen={!!g.state.seenStories[a.id]} />
         </button>
         <div className="flex-1 leading-tight">
-          <button onClick={() => onProfile(a.id)} className="text-[13.5px] font-semibold">
+          <button onClick={() => onProfile(a.id)} className="text-[14px] font-semibold">
             {a.handle} {a.verified && <Verified />}
           </button>
           <div className="text-[11.5px] text-muted-foreground">{g.t("demoData")}</div>
@@ -348,13 +351,30 @@ export function IGPost({
           onScroll={(e) =>
             setIdx(Math.round(Math.abs(e.currentTarget.scrollLeft) / e.currentTarget.clientWidth))
           }
-          onClick={() => {
+          onPointerDown={(e) => {
+            touchStart.current = { x: e.clientX, y: e.clientY };
+            moved.current = false;
+          }}
+          onPointerMove={(e) => {
+            if (Math.hypot(e.clientX - touchStart.current.x, e.clientY - touchStart.current.y) > 10)
+              moved.current = true;
+          }}
+          onClick={(e) => {
+            if (moved.current) {
+              lastTap.current = 0;
+              return;
+            }
             const now = Date.now();
-            if (now - lastTap < 300) {
+            if (now - lastTap.current < 300) {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setBurstPoint({
+                x: Math.max(12, Math.min(88, ((e.clientX - rect.left) / rect.width) * 100)),
+                y: Math.max(12, Math.min(88, ((e.clientY - rect.top) / rect.height) * 100)),
+              });
               g.toggle("liked", post.id, true);
               setBurst((b) => b + 1);
             }
-            setLastTap(now);
+            lastTap.current = now - lastTap.current < 300 ? 0 : now;
           }}
         >
           {post.media.map((m, i) => (
@@ -372,7 +392,8 @@ export function IGPost({
         {burst > 0 && (
           <Heart
             key={burst}
-            className="pointer-events-none absolute start-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2 animate-heart-burst fill-media-foreground text-media-foreground rtl:translate-x-1/2"
+            style={{ left: `${burstPoint.x}%`, top: `${burstPoint.y}%` }}
+            className="pointer-events-none absolute size-24 -translate-x-1/2 -translate-y-1/2 animate-heart-burst ig-burst fill-current"
           />
         )}
       </div>
@@ -381,12 +402,22 @@ export function IGPost({
           <button
             onClick={() => g.toggle("liked", post.id)}
             aria-label="like"
-            className="active:scale-75 transition-transform"
+            aria-pressed={liked}
+            data-active={liked}
+            className="reaction reaction-like flex items-center gap-1"
           >
-            <Heart className={cn("size-[26px]", liked && "fill-like text-like animate-pop")} />
+            <Heart className={cn("size-[26px]", liked && "fill-like text-like")} />
+            <span className="text-[12px] font-semibold tabular-nums">
+              {fmtCount(g.likeCount(post), g.lang)}
+            </span>
           </button>
-          <button onClick={() => onComments(post.id)} aria-label="comment">
+          <button
+            onClick={() => onComments(post.id)}
+            aria-label="comment"
+            className="flex items-center gap-1"
+          >
             <MessageCircle className="size-[26px] -scale-x-100" />
+            <span className="text-[12px] font-semibold tabular-nums">{fmtCount(n, g.lang)}</span>
           </button>
           <button
             onClick={async () => {
@@ -424,7 +455,13 @@ export function IGPost({
           </div>
         )}
         <div className="flex flex-1 justify-end">
-          <button onClick={() => g.toggle("saved", post.id)} aria-label="save">
+          <button
+            onClick={() => g.toggle("saved", post.id)}
+            aria-label="save"
+            aria-pressed={saved}
+            data-active={saved}
+            className="reaction reaction-save"
+          >
             <Bookmark className={cn("size-[26px]", saved && "fill-foreground")} />
           </button>
         </div>
@@ -566,7 +603,7 @@ function IGProfile({
         {p.isMe ? (
           <button
             onClick={() => toast(g.t("uploadDisabled"))}
-            className="flex-1 rounded-lg bg-secondary py-1.5 text-[13.5px] font-semibold"
+            className="flex-1 rounded-lg bg-secondary py-1.5 text-[14px] font-semibold"
           >
             {g.t("edit")}
           </button>
@@ -575,7 +612,7 @@ function IGProfile({
         )}
         <button
           onClick={() => toast(g.t("shareSimulated"))}
-          className="flex-1 rounded-lg bg-secondary py-1.5 text-[13.5px] font-semibold"
+          className="flex-1 rounded-lg bg-secondary py-1.5 text-[14px] font-semibold"
         >
           {g.lang === "ar" ? "مشاركة الملف" : "Share profile"}
         </button>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Bot, Camera, Check, Layers, Lock, Music2, RotateCcw, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -14,29 +14,63 @@ import { XLogo } from "./x";
 export function PlatformSwitcher() {
   const g = useGallery();
   const [open, setOpen] = useState(false);
+  const historyPending = useRef(false);
+  const queuedOpen = useRef(false);
+  const show = () => {
+    if (historyPending.current) {
+      queuedOpen.current = true;
+      return;
+    }
+    if (!history.state?.gallerySwitcher)
+      history.pushState({ ...history.state, gallerySwitcher: true }, "");
+    setOpen(true);
+  };
+  const hide = () => {
+    setOpen(false);
+    if (!historyPending.current && history.state?.gallerySwitcher) {
+      historyPending.current = true;
+      history.back();
+    }
+  };
+  useEffect(() => {
+    const back = () => {
+      setOpen(false);
+      historyPending.current = false;
+      if (queuedOpen.current) {
+        queuedOpen.current = false;
+        show();
+      }
+    };
+    window.addEventListener("popstate", back);
+    return () => {
+      window.removeEventListener("popstate", back);
+    };
+  }, []);
   const [settings, setSettings] = useState(false);
   const modes: { id: Mode; label: string; icon: React.ReactNode }[] = [
-    { id: "ig", label: g.t("igName"), icon: <Camera className="size-5" /> },
-    { id: "x", label: g.t("xName"), icon: <XLogo className="size-4" /> },
-    { id: "tt", label: g.t("ttName"), icon: <Music2 className="size-5" /> },
+    { id: "ig", label: "صور", icon: <Camera className="size-5" /> },
+    { id: "x", label: "ملاحظات", icon: <XLogo className="size-4" /> },
+    { id: "tt", label: "فيديوهات", icon: <Music2 className="size-5" /> },
   ];
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={show}
         aria-label={g.t("switchView")}
         className="absolute end-0 top-[38%] z-30 flex h-12 w-5 items-center justify-center rounded-s-xl bg-switcher text-switcher-foreground opacity-60 backdrop-blur-md transition-all hover:w-7 hover:opacity-100 active:w-7"
       >
         <Layers className="size-3.5" />
       </button>
-      <BottomSheet open={open} onClose={() => setOpen(false)} title={g.t("switchView")}>
+      <BottomSheet open={open} onClose={hide} title={g.t("switchView")}>
         <div className="space-y-2 p-4">
           {modes.map((m) => (
             <button
               key={m.id}
+              aria-pressed={g.state.mode === m.id}
+              data-platform={m.id}
               onClick={() => {
+                hide();
                 g.set("mode", m.id);
-                setOpen(false);
               }}
               className={cn(
                 "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-start transition-colors",
@@ -51,7 +85,9 @@ export function PlatformSwitcher() {
               >
                 {m.icon}
               </span>
-              <span className="flex-1 font-semibold">{m.label}</span>
+              <span dir="rtl" className={cn("platform-label flex-1", `platform-label-${m.id}`)}>
+                {m.label}
+              </span>
               {g.state.mode === m.id && <Check className="size-5 text-primary" />}
             </button>
           ))}
@@ -66,7 +102,7 @@ export function PlatformSwitcher() {
             />
             <button
               onClick={() => {
-                setOpen(false);
+                hide();
                 setSettings(true);
               }}
               className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-semibold"

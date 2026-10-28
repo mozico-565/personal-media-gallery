@@ -25,7 +25,10 @@ export type Profile = {
   followingCount: number;
 };
 
+export type NoteAttachment = { id: string; kind: "image" | "video"; name: string };
+
 export type Post = {
+  attachment?: NoteAttachment;
   id: string;
   authorId: string;
   media: MediaItem[];

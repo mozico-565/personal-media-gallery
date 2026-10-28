@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
+  ImagePlus,
+  X as Close,
+  MoreHorizontal,
   BarChart2,
   Bookmark,
   Heart,
@@ -18,7 +21,9 @@ import { cn } from "@/lib/utils";
 import { fmtCount, timeAgo } from "./i18n";
 import { ME, useGallery } from "./store";
 import { Avatar, BottomSheet, FollowButton, Verified } from "./shared";
-import type { Comment, Post } from "./types";
+import { NoteAttachment } from "./note-attachment";
+import { deleteNoteMedia, saveNoteMedia, storageMessage, validateNoteMedia } from "./note-media";
+import type { NoteAttachment as Attachment, Comment, Post } from "./types";
 
 export function XLogo({ className }: { className?: string }) {
   return (
@@ -243,9 +248,10 @@ function Actions({ post, onReply, big }: { post: Post; onReply: () => void; big?
           e.stopPropagation();
           g.toggle("liked", post.id);
         }}
-        className={cn(btn, liked && "text-x-like")}
+        data-active={liked}
+        className={cn(btn, "reaction reaction-like", liked && "text-x-like")}
       >
-        <Heart className={cn(sz, liked && "fill-current animate-pop")} />
+        <Heart className={cn(sz, liked && "fill-current")} />
         {!big && fmtCount(g.likeCount(post), g.lang)}
       </button>
       {!big && (
@@ -262,7 +268,8 @@ function Actions({ post, onReply, big }: { post: Post; onReply: () => void; big?
             e.stopPropagation();
             g.toggle("saved", post.id);
           }}
-          className={cn(btn, sv && "text-primary")}
+          data-active={sv}
+          className={cn(btn, "reaction reaction-save", sv && "text-primary")}
         >
           <Bookmark className={cn(sz, sv && "fill-current")} />
         </button>
@@ -295,7 +302,7 @@ function Tweet({
   return (
     <article
       onClick={onOpen}
-      className="cursor-pointer border-b border-border px-4 py-3 transition-colors active:bg-muted/40"
+      className="note-card relative cursor-pointer border-b border-border px-4 py-3 transition-colors active:bg-muted/40"
     >
       {g.state.reposted[post.id] && (
         <div className="mb-1 flex items-center gap-2 ps-8 text-[13px] font-bold text-muted-foreground">
@@ -317,13 +324,14 @@ function Tweet({
           <div className="flex items-center gap-1 text-[15px] leading-5">
             <span className="truncate font-bold">{a.name[g.lang]}</span>
             {a.verified && <Verified />}
-            <span className="truncate text-muted-foreground">
+            <span dir="ltr" className="truncate text-muted-foreground">
               @{a.handle} · {timeAgo(post.createdAt, g.lang)}
             </span>
           </div>
           <p dir="auto" className="whitespace-pre-wrap break-words text-[15px] leading-5">
             {post.caption[g.lang]}
           </p>
+          {post.attachment && <NoteAttachment attachment={post.attachment} />}
           <NoteTools post={post} />
 
           <Actions post={post} onReply={onOpen} />
@@ -383,6 +391,7 @@ function Thread({
         <p dir="auto" className="mt-3 whitespace-pre-wrap break-words text-[17px] leading-6">
           {post.caption[g.lang]}
         </p>
+        {post.attachment && <NoteAttachment attachment={post.attachment} />}
         <NoteTools post={post} />
 
         <div className="py-4 text-[15px] text-muted-foreground">
@@ -497,7 +506,7 @@ function Reply({
       <div className="min-w-0 flex-1 pb-3">
         <div className="flex items-center gap-1 text-[15px]">
           <span className="font-bold">{a.name[g.lang]}</span>
-          <span className="truncate text-muted-foreground">
+          <span dir="ltr" className="truncate text-muted-foreground">
             @{a.handle} · {timeAgo(c.createdAt, g.lang)}
             {c.edited && ` · ${g.t("edited")}`}
           </span>
@@ -715,7 +724,7 @@ function XProfile({
   );
 }
 
-function NoteComposer({
+export function NoteComposer({
   open,
   onClose,
   note,
@@ -728,63 +737,183 @@ function NoteComposer({
 }) {
   const g = useGallery();
   const [editText, setEditText] = useState(note?.caption[g.lang] ?? "");
+  const [file, setFile] = useState<File | null>(null);
+  const [removed, setRemoved] = useState(false);
+  const [preview, setPreview] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
   const text = note ? editText : g.state.draft;
+  useEffect(() => {
+    if (!file) {
+      setPreview("");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  // A cancelled selection is never written to IndexedDB.
+  const close = () => {
+    if (!submitting.current) {
+      setFile(null);
+      setRemoved(false);
+      setError("");
+      onClose();
+    }
+  };
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim() || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    let added: Attachment | undefined;
+    try {
+      if (file) added = await saveNoteMedia(file);
+      g.saveNote(text, note?.id, quoteId, added ?? (removed ? null : undefined));
+      setFile(null);
+      setRemoved(false);
+      onClose();
+    } catch {
+      if (added) void deleteNoteMedia(added.id).catch(() => {});
+      setError(storageMessage());
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  };
   return (
     <BottomSheet
       open={open}
-      onClose={onClose}
+      onClose={close}
       title={g.lang === "ar" ? "ملاحظة شخصية" : "Personal note"}
-      className="h-[75%]"
+      className="h-[85%]"
     >
-      <form
-        className="flex min-h-0 flex-1 flex-col gap-4 p-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!text.trim()) return;
-          g.saveNote(text, note?.id, quoteId);
-          onClose();
-        }}
-      >
-        <div className="flex items-center justify-between">
-          <button type="button" onClick={onClose}>
+      <form onSubmit={submit} className="note-composer flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
+          <button type="button" disabled={busy} onClick={close}>
             {g.t("cancel")}
           </button>
           <button
-            disabled={!text.trim()}
-            className="rounded-full bg-primary px-5 py-2 font-bold text-primary-foreground disabled:opacity-40"
+            disabled={!text.trim() || busy}
+            className="rounded-full bg-primary px-5 py-1.5 font-bold text-primary-foreground disabled:opacity-40"
           >
-            {g.t("post")}
+            {busy ? (g.lang === "ar" ? "جار الحفظ…" : "Saving…") : g.t("post")}
           </button>
         </div>
-        <textarea
-          aria-label={g.t("whatsHappening")}
-          dir="auto"
-          maxLength={10000}
-          value={text}
-          onChange={(e) => (note ? setEditText(e.target.value) : g.set("draft", e.target.value))}
-          placeholder={g.t("whatsHappening")}
-          className="min-h-32 flex-1 resize-none bg-transparent text-xl outline-none"
-        />
-        {quoteId && (
-          <p className="rounded-xl border p-3 text-sm">
-            {g.notes.find((p) => p.id === quoteId)?.caption[g.lang] ??
-              (g.lang === "ar" ? "الملاحظة الأصلية حُذفت" : "Original note deleted")}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="flex gap-3">
+            <Avatar p={g.profile(ME)} size={40} />
+            <textarea
+              aria-label={g.t("whatsHappening")}
+              dir="auto"
+              maxLength={10000}
+              disabled={busy}
+              value={text}
+              onChange={(e) =>
+                note ? setEditText(e.target.value) : g.set("draft", e.target.value)
+              }
+              placeholder={g.t("whatsHappening")}
+              className="min-h-32 w-full resize-y bg-transparent text-xl outline-none"
+            />
+          </div>
+          {(file || (note?.attachment && !removed)) && (
+            <div className="relative mt-3">
+              <button
+                type="button"
+                disabled={busy}
+                aria-label="Remove attachment / إزالة المرفق"
+                onClick={() => {
+                  setFile(null);
+                  setRemoved(true);
+                }}
+                className="absolute end-2 top-2 z-10 flex size-9 items-center justify-center rounded-full bg-black/75 text-white"
+              >
+                <Close className="size-5" />
+              </button>
+              {file ? (
+                <div className="note-attachment">
+                  {file.type.startsWith("image/") ? (
+                    <img src={preview} alt={file.name} className="max-h-64 w-full object-contain" />
+                  ) : (
+                    <video src={preview} controls muted playsInline className="max-h-64 w-full" />
+                  )}
+                </div>
+              ) : (
+                note?.attachment && <NoteAttachment attachment={note.attachment} />
+              )}
+            </div>
+          )}
+          {quoteId && (
+            <p className="mt-3 rounded-xl border p-3 text-sm">
+              {g.notes.find((p) => p.id === quoteId)?.caption[g.lang] ??
+                (g.lang === "ar" ? "الملاحظة الأصلية حُذفت" : "Original note deleted")}
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
+        <div className="shrink-0 border-t border-border px-4 py-2">
+          <input
+            ref={input}
+            type="file"
+            hidden
+            accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/ogg"
+            aria-label="Note attachment / مرفق الملاحظة"
+            disabled={busy}
+            onChange={(e) => {
+              const chosen = e.target.files?.[0];
+              e.target.value = "";
+              if (!chosen) return;
+              try {
+                validateNoteMedia(chosen);
+                setFile(chosen);
+                setRemoved(false);
+                setError("");
+              } catch (err) {
+                setError((err as Error).message);
+              }
+            }}
+          />
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => input.current?.click()}
+              className="flex items-center gap-2 text-sm font-semibold text-primary"
+            >
+              <ImagePlus className="size-5" />
+              {g.lang === "ar"
+                ? file || note?.attachment
+                  ? "استبدال المرفق"
+                  : "إرفاق صورة أو فيديو"
+                : file || note?.attachment
+                  ? "Replace attachment"
+                  : "Attach photo or video"}
+            </button>
+            <span className="text-xs text-muted-foreground">{text.length}/10000</span>
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {g.lang === "ar"
+              ? "على جهازك فقط · مرفق واحد حتى 50 ميغابايت · تُحفظ مسودة النص تلقائيًا"
+              : "Only on this device · one attachment up to 50 MB · text draft saved automatically"}
           </p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          {g.lang === "ar"
-            ? "محفوظة على جهازك فقط · المسودة تُحفظ تلقائيًا"
-            : "Only on your device · draft saved automatically"}{" "}
-          · {text.length}/10000
-        </p>
+        </div>
       </form>
     </BottomSheet>
   );
 }
+
 function NoteTools({ post }: { post: Post }) {
   const g = useGallery();
   const [edit, setEdit] = useState(false);
   const [quote, setQuote] = useState(false);
+  const [tools, setTools] = useState(false);
   const original = post.quoteId ? g.notes.find((p) => p.id === post.quoteId) : null;
   return (
     <div onClick={(e) => e.stopPropagation()}>
@@ -797,17 +926,54 @@ function NoteTools({ post }: { post: Post }) {
             (g.lang === "ar" ? "الملاحظة الأصلية حُذفت" : "Original note deleted")}
         </blockquote>
       )}
-      <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
-        <button onClick={() => setQuote(true)}>{g.lang === "ar" ? "اقتباس" : "Quote"}</button>
-        {post.authorId === ME && (
-          <>
-            <button onClick={() => setEdit(true)}>{g.t("edit")}</button>
-            <button className="text-destructive" onClick={() => g.deleteNote(post.id)}>
-              {g.t("delete")}
-            </button>
-          </>
-        )}
-      </div>
+      <button
+        onClick={() => setTools(true)}
+        aria-label={g.lang === "ar" ? "خيارات الملاحظة" : "Note options"}
+        className="note-options"
+      >
+        <MoreHorizontal className="size-5" />
+      </button>
+      <BottomSheet
+        open={tools}
+        onClose={() => setTools(false)}
+        title={g.lang === "ar" ? "خيارات الملاحظة" : "Note options"}
+      >
+        <div className="flex flex-col gap-2 p-4 text-start text-sm font-semibold">
+          <button
+            onClick={() => {
+              setTools(false);
+              setQuote(true);
+            }}
+          >
+            {g.lang === "ar" ? "اقتباس" : "Quote"}
+          </button>
+          {post.authorId === ME && (
+            <>
+              <button
+                onClick={() => {
+                  setTools(false);
+                  setEdit(true);
+                }}
+              >
+                {g.t("edit")}
+              </button>
+              <button
+                className="text-destructive"
+                onClick={() => {
+                  try {
+                    g.deleteNote(post.id);
+                    setTools(false);
+                  } catch {
+                    toast(storageMessage());
+                  }
+                }}
+              >
+                {g.t("delete")}
+              </button>
+            </>
+          )}
+        </div>
+      </BottomSheet>
       {edit && <NoteComposer open onClose={() => setEdit(false)} note={post} />}
       {quote && <NoteComposer open onClose={() => setQuote(false)} quoteId={post.id} />}
     </div>

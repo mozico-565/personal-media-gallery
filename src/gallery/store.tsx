@@ -6,12 +6,22 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import { translate, type TKey } from "./i18n";
 import { readLocalMedia, saveLocalMedia } from "./local-media";
+import { deleteNoteMedia } from "./note-media";
 import { sampleRepository } from "./sample-repository";
-import type { Comment, GalleryRepository, Lang, Mode, Post, Profile } from "./types";
+import type {
+  Comment,
+  GalleryRepository,
+  Lang,
+  Mode,
+  NoteAttachment,
+  Post,
+  Profile,
+} from "./types";
 
 export const STORAGE_KEY = "social-gallery-v1";
 export const ME = "me";
@@ -89,6 +99,8 @@ function useGalleryApi(repo: GalleryRepository) {
   const [data] = useState(() => ({ profiles: repo.getProfiles(), posts: repo.getPosts() }));
   const [state, setState] = useState<GalleryState>(() => load(repo));
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const [localPosts, setLocalPosts] = useState<Post[]>([]);
   const [storageError, setStorageError] = useState(false);
   useEffect(() => {
@@ -121,39 +133,60 @@ function useGalleryApi(repo: GalleryRepository) {
     const posts = await saveLocalMedia(files);
     setLocalPosts((s) => [...posts, ...s]);
   }, []);
-  const saveNote = useCallback((text: string, id?: string, quoteId?: string) => {
-    if (!text.trim()) return;
-    setState((s) => {
-      if (id)
-        return {
-          ...s,
-          notes: s.notes.map((p) =>
-            p.id === id ? { ...p, caption: { en: text.trim(), ar: text.trim() } } : p,
-          ),
-        };
-      const note: Post = {
-        id: createLocalId(),
-        authorId: ME,
-        media: [],
-        caption: { en: text.trim(), ar: text.trim() },
-        createdAt: Date.now(),
-        baseLikes: 0,
-        baseReposts: 0,
-        views: 0,
-        quoteId,
-      };
-      return { ...s, draft: "", notes: [note, ...s.notes] };
-    });
-  }, []);
-  const deleteNote = useCallback(
-    (id: string) =>
-      setState((s) => ({
+  // Commit metadata before reporting success or deleting the previous blob.
+  const saveNote = useCallback(
+    (text: string, id?: string, quoteId?: string, attachment?: NoteAttachment | null) => {
+      if (!text.trim()) return;
+      const s = stateRef.current;
+      const old = id ? s.notes.find((p) => p.id === id) : undefined;
+      const note: Post = old
+        ? { ...old, caption: { en: text.trim(), ar: text.trim() } }
+        : {
+            id: createLocalId(),
+            authorId: ME,
+            media: [],
+            caption: { en: text.trim(), ar: text.trim() },
+            createdAt: Date.now(),
+            baseLikes: 0,
+            baseReposts: 0,
+            views: 0,
+            quoteId,
+          };
+      if (attachment !== undefined) {
+        if (attachment === null) delete note.attachment;
+        else note.attachment = attachment;
+      }
+      const next = {
         ...s,
-        notes: s.notes.filter((p) => p.id !== id),
-        comments: s.comments.filter((c) => c.postId !== id),
-      })),
+        draft: id ? s.draft : "",
+        notes: id ? s.notes.map((p) => (p.id === id ? note : p)) : [note, ...s.notes],
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      stateRef.current = next;
+      setState(next);
+      if (
+        old?.attachment &&
+        old.attachment.id !== note.attachment?.id &&
+        !next.notes.some((p) => p.attachment?.id === old.attachment!.id)
+      )
+        void deleteNoteMedia(old.attachment.id).catch(() => {});
+    },
     [],
   );
+  const deleteNote = useCallback((id: string) => {
+    const s = stateRef.current;
+    const old = s.notes.find((p) => p.id === id);
+    const next = {
+      ...s,
+      notes: s.notes.filter((p) => p.id !== id),
+      comments: s.comments.filter((c) => c.postId !== id),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    stateRef.current = next;
+    setState(next);
+    if (old?.attachment && !next.notes.some((p) => p.attachment?.id === old.attachment!.id))
+      void deleteNoteMedia(old.attachment.id).catch(() => {});
+  }, []);
   useEffect(() => {
     document.documentElement.lang = state.lang;
     document.documentElement.dir = state.lang === "ar" ? "rtl" : "ltr";

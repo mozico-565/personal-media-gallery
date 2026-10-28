@@ -7,11 +7,13 @@ import {
   Music2,
   Plus,
   Send,
+  Forward,
   Volume2,
   VolumeX,
   X,
   Play,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fmtCount, timeAgo } from "./i18n";
@@ -90,13 +92,26 @@ export function BottomSheet({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
+  const [mounted, setMounted] = useState(open);
   const close = useRef(onClose);
   close.current = onClose;
+  const dismiss = () => close.current();
+  const visible = open || mounted;
+  // Keep controlled sheets present until exit finishes. Reopening cancels cleanup.
   useEffect(() => {
-    if (!open) return;
+    if (open) {
+      setMounted(true);
+      return;
+    }
+    const delay = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 180;
+    const timer = setTimeout(() => setMounted(false), delay);
+    return () => clearTimeout(timer);
+  }, [open]);
+  useEffect(() => {
+    if (!visible) return;
     const previous = document.activeElement as HTMLElement | null;
     const el = ref.current;
-    el?.focus();
+    el?.focus({ preventScroll: true });
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -125,14 +140,23 @@ export function BottomSheet({
     el?.addEventListener("keydown", key);
     return () => {
       el?.removeEventListener("keydown", key);
-      previous?.focus();
+      if (document.activeElement === document.body || el?.contains(document.activeElement))
+        previous?.focus({ preventScroll: true });
     };
-  }, [open]);
+  }, [visible]);
   const start = useRef(0);
-  if (!open) return null;
-  return (
-    <div className="absolute inset-0 z-40">
-      <div onClick={onClose} className="absolute inset-0 bg-overlay animate-in fade-in" />
+  if (!visible) return null;
+  return createPortal(
+    <div
+      className="sheet-layer absolute inset-0 z-40"
+      data-exiting={!open}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        data-testid="sheet-backdrop"
+        onClick={dismiss}
+        className="sheet-backdrop absolute inset-0 bg-overlay"
+      />
       <div
         ref={ref}
         tabIndex={-1}
@@ -140,7 +164,7 @@ export function BottomSheet({
         aria-modal="true"
         aria-labelledby={id}
         className={cn(
-          "absolute inset-x-0 bottom-0 flex max-h-[90%] flex-col rounded-t-2xl bg-sheet text-sheet-foreground pb-safe shadow-sheet animate-in slide-in-from-bottom duration-200 outline-none",
+          "sheet-panel absolute inset-x-0 bottom-0 flex max-h-[90%] flex-col rounded-t-2xl bg-sheet text-sheet-foreground pb-safe shadow-sheet outline-none",
           className,
         )}
       >
@@ -149,7 +173,7 @@ export function BottomSheet({
             start.current = e.touches[0]!.clientY;
           }}
           onTouchEnd={(e) => {
-            if (e.changedTouches[0]!.clientY - start.current > 70) onClose();
+            if (e.changedTouches[0]!.clientY - start.current > 70) dismiss();
           }}
           className="flex min-h-6 items-center justify-center"
         >
@@ -159,7 +183,7 @@ export function BottomSheet({
           <span id={id}>{title}</span>
           <button
             aria-label="Close / إغلاق"
-            onClick={onClose}
+            onClick={dismiss}
             className="absolute end-2 top-0 flex size-9 items-center justify-center"
           >
             <X className="size-5" />
@@ -167,7 +191,8 @@ export function BottomSheet({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.querySelector(".phone-frame") ?? document.body,
   );
 }
 
@@ -555,6 +580,8 @@ function Slide({
   const [idx, setIdx] = useState(0);
   const [burst, setBurst] = useState(0);
   const lastTap = useRef(0);
+  const touchStart = useRef({ x: 0, y: 0 });
+  const moved = useRef(false);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(tapTimer.current), []);
   const author = g.profile(post.authorId);
@@ -574,11 +601,17 @@ function Slide({
   }, []);
 
   const onTap = () => {
+    if (moved.current) {
+      lastTap.current = 0;
+      return;
+    }
     const now = Date.now();
     clearTimeout(tapTimer.current);
     if (now - lastTap.current < 280) {
       g.toggle("liked", post.id, true);
       setBurst((b) => b + 1);
+      lastTap.current = 0;
+      return;
     } else
       tapTimer.current = setTimeout(() => {
         if (Date.now() - lastTap.current >= 280 && hasVideo) setPaused((p) => !p);
@@ -586,7 +619,8 @@ function Slide({
     lastTap.current = now;
   };
 
-  const railBtn = "flex flex-col items-center gap-1 text-[12px] font-semibold drop-shadow-media";
+  const railBtn =
+    "relative min-w-11 min-h-11 flex flex-col items-center gap-1 text-[12px] font-semibold drop-shadow-media";
   const iconCls = variant === "tt" ? "size-8 fill-media-foreground" : "size-7";
   return (
     <section
@@ -595,6 +629,16 @@ function Slide({
     >
       <div
         className="absolute inset-0 flex snap-x snap-mandatory overflow-x-auto no-scrollbar"
+        onPointerDown={(e) => {
+          touchStart.current = { x: e.clientX, y: e.clientY };
+          moved.current = false;
+        }}
+        onPointerMove={(e) => {
+          if (Math.hypot(e.clientX - touchStart.current.x, e.clientY - touchStart.current.y) > 10) {
+            moved.current = true;
+            clearTimeout(tapTimer.current);
+          }
+        }}
         onClick={onTap}
         onScroll={(e) =>
           setIdx(Math.round(Math.abs(e.currentTarget.scrollLeft) / e.currentTarget.clientWidth))
@@ -602,7 +646,13 @@ function Slide({
       >
         {post.media.map((m, i) => (
           <div key={m.id + i} className="h-full w-full shrink-0 snap-center">
-            <MediaView m={m} active={active && i === idx} muted={muted} paused={paused} />
+            <MediaView
+              m={m}
+              active={active && i === idx}
+              muted={muted}
+              paused={paused}
+              className={variant === "tt" ? "object-contain" : ""}
+            />
           </div>
         ))}
       </div>
@@ -647,7 +697,13 @@ function Slide({
             )}
           </div>
         )}
-        <button className={railBtn} onClick={() => g.toggle("liked", post.id)} aria-label="like">
+        <button
+          className={cn(railBtn, "reaction reaction-like")}
+          data-active={liked}
+          aria-pressed={liked}
+          onClick={() => g.toggle("liked", post.id)}
+          aria-label="like"
+        >
           <Heart
             className={cn(
               iconCls,
@@ -665,7 +721,13 @@ function Slide({
           />
           {fmtCount(g.commentsFor(post.id).length, g.lang)}
         </button>
-        <button className={railBtn} onClick={() => g.toggle("saved", post.id)} aria-label="save">
+        <button
+          className={cn(railBtn, "reaction reaction-save")}
+          data-active={saved}
+          aria-pressed={saved}
+          onClick={() => g.toggle("saved", post.id)}
+          aria-label="save"
+        >
           <Bookmark
             className={cn(
               iconCls,
@@ -676,10 +738,11 @@ function Slide({
           {variant === "tt" && fmtCount(post.baseReposts + (saved ? 1 : 0), g.lang)}
         </button>
         <button className={railBtn} onClick={() => toast(g.t("shareSimulated"))} aria-label="share">
-          <Send
-            className={cn(variant === "tt" ? "size-7 fill-media-foreground" : "size-7")}
-            strokeWidth={variant === "tt" ? 1 : 2}
-          />
+          {variant === "tt" ? (
+            <Forward className="size-8 fill-media-foreground" strokeWidth={1.5} />
+          ) : (
+            <Send className="size-7" />
+          )}
         </button>
         {hasVideo && (
           <button className={railBtn} onClick={() => setMuted(!muted)} aria-label="mute">
