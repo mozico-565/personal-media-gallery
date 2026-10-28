@@ -30,3 +30,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Optional portable review build scratch files
+.portable-entry.jsx
+.portable-entry.html
+.portable-build/
+social-gallery-v3-preview.html
