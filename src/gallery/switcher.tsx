@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Bot, Camera, Check, Layers, Lock, Music2, RotateCcw, Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -9,34 +9,69 @@ import { MediaImport } from "./media-import";
 import { BottomSheet } from "./shared";
 import type { Mode } from "./types";
 import { XLogo } from "./x";
+import { DEFAULT_X_ACCENT, accentForeground, validAccent } from "./x-accent";
 
 /** Discreet edge handle available in every mode. */
 export function PlatformSwitcher() {
   const g = useGallery();
   const [open, setOpen] = useState(false);
+  const historyPending = useRef(false);
+  const queuedOpen = useRef(false);
+  const show = () => {
+    if (historyPending.current) {
+      queuedOpen.current = true;
+      return;
+    }
+    if (!history.state?.gallerySwitcher)
+      history.pushState({ ...history.state, gallerySwitcher: true }, "");
+    setOpen(true);
+  };
+  const hide = () => {
+    setOpen(false);
+    if (!historyPending.current && history.state?.gallerySwitcher) {
+      historyPending.current = true;
+      history.back();
+    }
+  };
+  useEffect(() => {
+    const back = () => {
+      setOpen(false);
+      historyPending.current = false;
+      if (queuedOpen.current) {
+        queuedOpen.current = false;
+        show();
+      }
+    };
+    window.addEventListener("popstate", back);
+    return () => {
+      window.removeEventListener("popstate", back);
+    };
+  }, []);
   const [settings, setSettings] = useState(false);
   const modes: { id: Mode; label: string; icon: React.ReactNode }[] = [
-    { id: "ig", label: g.t("igName"), icon: <Camera className="size-5" /> },
-    { id: "x", label: g.t("xName"), icon: <XLogo className="size-4" /> },
-    { id: "tt", label: g.t("ttName"), icon: <Music2 className="size-5" /> },
+    { id: "ig", label: "صور", icon: <Camera className="size-5" /> },
+    { id: "x", label: "ملاحظات", icon: <XLogo className="size-4" /> },
+    { id: "tt", label: "فيديوهات", icon: <Music2 className="size-5" /> },
   ];
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={show}
         aria-label={g.t("switchView")}
         className="absolute end-0 top-[38%] z-30 flex h-12 w-5 items-center justify-center rounded-s-xl bg-switcher text-switcher-foreground opacity-60 backdrop-blur-md transition-all hover:w-7 hover:opacity-100 active:w-7"
       >
         <Layers className="size-3.5" />
       </button>
-      <BottomSheet open={open} onClose={() => setOpen(false)} title={g.t("switchView")}>
+      <BottomSheet open={open} onClose={hide} title={g.t("switchView")}>
         <div className="space-y-2 p-4">
           {modes.map((m) => (
             <button
               key={m.id}
+              aria-pressed={g.state.mode === m.id}
+              data-platform={m.id}
               onClick={() => {
+                hide();
                 g.set("mode", m.id);
-                setOpen(false);
               }}
               className={cn(
                 "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-start transition-colors",
@@ -51,7 +86,9 @@ export function PlatformSwitcher() {
               >
                 {m.icon}
               </span>
-              <span className="flex-1 font-semibold">{m.label}</span>
+              <span dir="rtl" className={cn("platform-label flex-1", `platform-label-${m.id}`)}>
+                {m.label}
+              </span>
               {g.state.mode === m.id && <Check className="size-5 text-primary" />}
             </button>
           ))}
@@ -66,7 +103,7 @@ export function PlatformSwitcher() {
             />
             <button
               onClick={() => {
-                setOpen(false);
+                hide();
                 setSettings(true);
               }}
               className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm font-semibold"
@@ -143,16 +180,94 @@ const personalities = [
   },
 ];
 
+const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <section className="space-y-2">
+    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      {title}
+    </h3>
+    {children}
+  </section>
+);
+
+export function XAccentSettings() {
+  const g = useGallery();
+  const [hex, setHex] = useState(g.state.xAccent);
+  useEffect(() => setHex(g.state.xAccent), [g.state.xAccent]);
+  const colors = [DEFAULT_X_ACCENT, "#1d9bf0", "#8b5cf6", "#f91880", "#00ba7c", "#ffffff"];
+  return (
+    <Section title={g.lang === "ar" ? "لون واجهة X" : "X accent color"}>
+      <div className="rounded-xl border p-3 space-y-3">
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span>
+            {g.lang === "ar" ? "اختر أي لون" : "Choose any color"}
+            <span dir="ltr" className="block text-xs text-muted-foreground">
+              {g.state.xAccent.toUpperCase()}
+            </span>
+          </span>
+          <input
+            type="color"
+            aria-label={g.lang === "ar" ? "لون واجهة X" : "X accent color"}
+            value={g.state.xAccent}
+            onChange={(e) => g.set("xAccent", e.target.value)}
+            className="h-11 w-14 cursor-pointer rounded-md border bg-transparent p-1"
+          />
+        </label>
+        <label className="flex items-center justify-between gap-3 text-sm">
+          <span>{g.lang === "ar" ? "رمز اللون HEX" : "HEX color code"}</span>
+          <input
+            aria-label={g.lang === "ar" ? "رمز لون X" : "X HEX color"}
+            dir="ltr"
+            value={hex}
+            maxLength={7}
+            spellCheck={false}
+            aria-invalid={!validAccent(hex)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setHex(value);
+              if (validAccent(value)) g.set("xAccent", value.toLowerCase());
+            }}
+            className="h-11 w-28 rounded-md border bg-transparent px-2 font-mono text-sm"
+          />
+        </label>
+        {!validAccent(hex) && (
+          <p role="status" className="text-xs text-muted-foreground">
+            {g.lang === "ar"
+              ? "اكتب # وست خانات، مثل #7c3aed"
+              : "Use # and six hex digits, e.g. #7c3aed"}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {colors.map((color) => (
+            <button
+              key={color}
+              aria-label={`X ${color}`}
+              aria-pressed={g.state.xAccent.toLowerCase() === color}
+              onClick={() => g.set("xAccent", color)}
+              className="flex size-11 items-center justify-center rounded-lg border"
+              style={{ backgroundColor: color, color: accentForeground(color) }}
+            >
+              {g.state.xAccent.toLowerCase() === color && <Check className="size-5" />}
+            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => g.set("xAccent", DEFAULT_X_ACCENT)}
+          className="text-sm underline underline-offset-4"
+        >
+          {g.lang === "ar" ? "استعادة البرتقالي" : "Restore orange"}
+        </button>
+        <p className="text-xs text-muted-foreground">
+          {g.lang === "ar"
+            ? "يُحفظ على هذا الجهاز ويغيّر لون الأزرار والمؤشر في X فقط."
+            : "Saved on this device. Changes X buttons and tab indicators only."}
+        </p>
+      </div>
+    </Section>
+  );
+}
+
 function SettingsBody() {
   const g = useGallery();
-  const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h3>
-      {children}
-    </section>
-  );
   return (
     <div className="flex-1 space-y-6 overflow-y-auto p-4 no-scrollbar">
       <Section title={g.t("language")}>
@@ -174,6 +289,7 @@ function SettingsBody() {
           <Switch checked={g.state.dark} onCheckedChange={(v) => g.set("dark", v)} />
         </label>
       </Section>
+      <XAccentSettings />
       <Section title={g.t("mediaSource")}>
         <div className="divide-y divide-border rounded-xl border border-border text-sm">
           <div className="flex items-center gap-2 px-4 py-3">

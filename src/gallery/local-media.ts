@@ -2,11 +2,29 @@ import { createLocalId } from "./local-id";
 import type { Post } from "./types";
 
 type Entry = { id: string; file: Blob; name: string; kind: "image" | "video"; createdAt: number };
-const open = () =>
+export const openMediaDatabase = () =>
   new Promise<IDBDatabase>((resolve, reject) => {
-    const req = indexedDB.open("social-gallery-media", 1);
-    req.onupgradeneeded = () => req.result.createObjectStore("media", { keyPath: "id" });
-    req.onsuccess = () => resolve(req.result);
+    let abandoned = false;
+    const req = indexedDB.open("social-gallery-media", 2);
+    req.onupgradeneeded = () => {
+      for (const name of ["media", "noteMedia"])
+        if (!req.result.objectStoreNames.contains(name))
+          req.result.createObjectStore(name, { keyPath: "id" });
+    };
+    req.onsuccess = () => {
+      if (abandoned) {
+        req.result.close();
+        return;
+      }
+      req.result.onversionchange = () => req.result.close();
+      resolve(req.result);
+    };
+    req.onblocked = () => {
+      abandoned = true;
+      reject(
+        new Error("Close older gallery tabs and retry / أغلق تبويبات المعرض القديمة وأعد المحاولة"),
+      );
+    };
     req.onerror = () => reject(req.error);
   });
 const toPost = (e: Entry): Post => ({
@@ -29,7 +47,7 @@ const toPost = (e: Entry): Post => ({
   ],
 });
 export async function readLocalMedia(): Promise<Post[]> {
-  const db = await open();
+  const db = await openMediaDatabase();
   return new Promise((resolve, reject) => {
     const tx = db.transaction("media");
     const req = tx.objectStore("media").getAll();
@@ -54,7 +72,7 @@ export async function saveLocalMedia(files: File[]): Promise<Post[]> {
     kind: file.type.startsWith("image/") ? "image" : "video",
     createdAt: Date.now(),
   }));
-  const db = await open();
+  const db = await openMediaDatabase();
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction("media", "readwrite");
     entries.forEach((e) => tx.objectStore("media").put(e));

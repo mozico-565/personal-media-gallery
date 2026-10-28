@@ -1,7 +1,7 @@
 import type { Lang } from "./types";
 
 const en = {
-  appName: "Social Gallery V2",
+  appName: "Social Gallery V3",
   demo: "DEMO",
   demoData: "Demo data · sample media",
   home: "Home",
@@ -77,7 +77,7 @@ const en = {
 };
 type Dict = typeof en;
 const ar: Dict = {
-  appName: "معرض اجتماعي V2",
+  appName: "معرض اجتماعي V3",
   demo: "تجريبي",
   demoData: "بيانات تجريبية · وسائط نموذجية",
   home: "الرئيسية",

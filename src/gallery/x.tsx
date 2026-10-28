@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowLeft,
+  ImagePlus,
+  X as Close,
+  MoreHorizontal,
   BarChart2,
   Bookmark,
   Heart,
@@ -11,14 +14,20 @@ import {
   Search,
   Share,
   Trash2,
-  User,
+  Bell,
+  Compass,
+  SquarePen,
+  Plus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fmtCount, timeAgo } from "./i18n";
 import { ME, useGallery } from "./store";
 import { Avatar, BottomSheet, FollowButton, Verified } from "./shared";
-import type { Comment, Post } from "./types";
+import { NoteAttachment } from "./note-attachment";
+import { deleteNoteMedia, saveNoteMedia, storageMessage, validateNoteMedia } from "./note-media";
+import type { NoteAttachment as Attachment, Comment, Post } from "./types";
+import { xAccentStyle } from "./x-accent";
 
 export function XLogo({ className }: { className?: string }) {
   return (
@@ -28,13 +37,13 @@ export function XLogo({ className }: { className?: string }) {
   );
 }
 
-type Tab = "home" | "search" | "bookmarks" | "profile";
+type Tab = "home" | "search" | "bookmarks" | "profile" | "activity";
 
 export function XMode() {
   const g = useGallery();
   const [composing, setComposing] = useState(false);
   const [tab, setTab] = useState<Tab>("home");
-  const [feed, setFeed] = useState<"for" | "following">("for");
+  const [feed, setFeed] = useState<"for" | "following" | "media" | "text">("for");
   const [thread, setThread] = useState<string | null>(null);
   const [profileId, setProfileId] = useState(ME);
   const openProfile = (id: string) => {
@@ -50,10 +59,19 @@ export function XMode() {
   const posts =
     feed === "for"
       ? g.notes
-      : g.notes.filter((p) => g.state.following[p.authorId] || p.authorId === ME);
+      : g.notes.filter((p) =>
+          feed === "media"
+            ? !!p.attachment
+            : feed === "text"
+              ? !p.attachment
+              : g.state.following[p.authorId] || p.authorId === ME,
+        );
 
   return (
-    <div className="x-type flex h-full flex-col bg-background text-foreground">
+    <div
+      className="x-type flex h-full flex-col bg-background text-foreground"
+      style={xAccentStyle(g.state.xAccent)}
+    >
       <main
         key={tab + profileId + (thread ?? "")}
         className="relative min-h-0 flex-1 overflow-y-auto no-scrollbar animate-in fade-in duration-200"
@@ -65,33 +83,52 @@ export function XMode() {
             {tab === "home" && (
               <>
                 <header className="sticky top-0 z-10 border-b border-border bg-background/85 pt-safe backdrop-blur-md">
-                  <div className="relative flex h-[53px] items-center justify-center px-4">
-                    <button className="absolute start-4" onClick={() => go("profile")}>
+                  <div className="x-home-header relative flex items-center justify-center px-4">
+                    <button
+                      aria-label={g.t("profile")}
+                      className="absolute start-4"
+                      onClick={() => go("profile")}
+                    >
                       <Avatar p={g.profile(ME)} size={32} />
                     </button>
-                    <XLogo className="size-[26px]" />
+                    <XLogo className="size-[25px]" />
+                    <button
+                      className="x-header-tools absolute end-4"
+                      onClick={() => go("bookmarks")}
+                    >
+                      {g.t("saved")}
+                    </button>
                   </div>
-                  <div className="flex">
-                    {(["for", "following"] as const).map((f) => (
+                  <div className="x-feed-tabs">
+                    {(["for", "following", "media", "text"] as const).map((f) => (
                       <button
                         key={f}
+                        aria-pressed={feed === f}
                         onClick={() => setFeed(f)}
-                        className={cn(
-                          "flex flex-1 justify-center text-[15px]",
-                          feed === f ? "font-bold" : "font-medium text-muted-foreground",
-                        )}
+                        className={cn("x-feed-tab", feed === f && "selected")}
                       >
-                        <span
-                          className={cn(
-                            "relative py-3.5",
-                            feed === f &&
-                              "after:absolute after:inset-x-0 after:bottom-0 after:h-1 after:rounded-full after:bg-primary",
-                          )}
-                        >
-                          {f === "for" ? g.t("forYou") : g.t("followingTab")}
-                        </span>
+                        {f === "for"
+                          ? g.t("forYou")
+                          : f === "following"
+                            ? g.lang === "ar"
+                              ? "متابع"
+                              : "Following"
+                            : f === "media"
+                              ? g.lang === "ar"
+                                ? "بمرفقات"
+                                : "Media"
+                              : g.lang === "ar"
+                                ? "نصوص"
+                                : "Text"}
                       </button>
                     ))}
+                    <button
+                      aria-label={g.lang === "ar" ? "ملاحظة جديدة" : "New note"}
+                      onClick={() => setComposing(true)}
+                      className="x-add-tab"
+                    >
+                      <Plus className="size-5" />
+                    </button>
                   </div>
                 </header>
                 {posts.length === 0 && (
@@ -112,6 +149,28 @@ export function XMode() {
               </>
             )}
             {tab === "search" && <XSearch onOpen={setThread} onProfile={openProfile} />}
+            {tab === "activity" && (
+              <>
+                <XHeader title={g.lang === "ar" ? "تفاعلاتي المحلية" : "My local activity"} />
+                {g.notes
+                  .filter((p) => g.state.liked[p.id] || g.state.reposted[p.id])
+                  .map((p) => (
+                    <Tweet
+                      key={p.id}
+                      post={p}
+                      onOpen={() => setThread(p.id)}
+                      onProfile={openProfile}
+                    />
+                  ))}
+                {!g.notes.some((p) => g.state.liked[p.id] || g.state.reposted[p.id]) && (
+                  <p className="p-8 text-center text-muted-foreground">
+                    {g.lang === "ar"
+                      ? "ستظهر هنا الملاحظات التي تفاعلت معها على هذا الجهاز"
+                      : "Notes you react to on this device appear here"}
+                  </p>
+                )}
+              </>
+            )}
             {tab === "bookmarks" && (
               <>
                 <XHeader title={g.t("bookmarks")} />
@@ -140,41 +199,56 @@ export function XMode() {
             )}
           </>
         )}
-        {!thread && tab === "home" && (
-          <button
-            onClick={() => setComposing(true)}
-            aria-label="compose"
-            className="sticky bottom-4 float-end me-4 flex size-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-fab active:scale-95"
-          >
-            <Pencil className="size-6" />
-          </button>
-        )}
       </main>
+      {!thread && tab === "home" && (
+        <button
+          onClick={() => setComposing(true)}
+          aria-label="compose"
+          className="x-compose absolute z-20 flex items-center justify-center rounded-full bg-primary text-primary-foreground shadow-fab active:scale-95"
+        >
+          <SquarePen className="size-[25px]" />
+        </button>
+      )}
       <NoteComposer open={composing} onClose={() => setComposing(false)} />
-      <nav className="shrink-0 border-t border-border bg-background pb-safe">
+      <nav className="x-nav shrink-0 border-t border-border bg-background pb-safe">
         <div className="flex h-[53px] items-center justify-around">
           {(
             [
               ["home", Home],
               ["search", Search],
-              ["bookmarks", Bookmark],
-              ["profile", User],
+              ["bookmarks", Compass],
+              ["activity", Bell],
             ] as const
           ).map(([k, I]) => (
             <button
               key={k}
               onClick={() => go(k)}
-              aria-label={k}
+              aria-label={
+                k === "activity" ? (g.lang === "ar" ? "تفاعلاتي" : "My activity") : g.t(k)
+              }
               className="flex flex-1 justify-center py-3 active:scale-90"
             >
               <I
                 className={cn(
-                  "size-[26px]",
+                  "size-[27px]",
                   tab === k && !thread && (k === "search" ? "stroke-[3]" : "fill-current"),
                 )}
               />
             </button>
           ))}
+          <button
+            aria-label={g.lang === "ar" ? "الرسائل — غير متاحة" : "Messages — unavailable"}
+            onClick={() =>
+              toast(
+                g.lang === "ar"
+                  ? "الرسائل غير متاحة في المعرض المحلي"
+                  : "Messages are unavailable in this local gallery",
+              )
+            }
+            className="flex flex-1 justify-center py-3"
+          >
+            <MessageCircle className="size-[27px]" />
+          </button>
         </div>
       </nav>
     </div>
@@ -204,12 +278,13 @@ function Actions({ post, onReply, big }: { post: Post; onReply: () => void; big?
   const liked = !!g.state.liked[post.id],
     rp = !!g.state.reposted[post.id],
     sv = !!g.state.saved[post.id];
-  const sz = big ? "size-[22px]" : "size-[18.75px]";
-  const btn = "group flex items-center gap-1 text-[13px] text-muted-foreground transition-colors";
+  const sz = big ? "size-[22px]" : "size-[18px]";
+  const btn =
+    "x-action group flex items-center gap-1 text-[12px] text-muted-foreground transition-colors";
   return (
     <div
       className={cn(
-        "flex items-center justify-between",
+        "x-actions flex items-center justify-between",
         big ? "border-y border-border px-2 py-3" : "mt-3 max-w-[425px]",
       )}
     >
@@ -243,9 +318,10 @@ function Actions({ post, onReply, big }: { post: Post; onReply: () => void; big?
           e.stopPropagation();
           g.toggle("liked", post.id);
         }}
-        className={cn(btn, liked && "text-x-like")}
+        data-active={liked}
+        className={cn(btn, "reaction reaction-like", liked && "text-x-like")}
       >
-        <Heart className={cn(sz, liked && "fill-current animate-pop")} />
+        <Heart className={cn(sz, liked && "fill-current")} />
         {!big && fmtCount(g.likeCount(post), g.lang)}
       </button>
       {!big && (
@@ -255,17 +331,20 @@ function Actions({ post, onReply, big }: { post: Post; onReply: () => void; big?
         </span>
       )}
       <span className="flex items-center gap-3">
-        <button
-          aria-label={g.t("save")}
-          aria-pressed={sv}
-          onClick={(e) => {
-            e.stopPropagation();
-            g.toggle("saved", post.id);
-          }}
-          className={cn(btn, sv && "text-primary")}
-        >
-          <Bookmark className={cn(sz, sv && "fill-current")} />
-        </button>
+        {big && (
+          <button
+            aria-label={g.t("save")}
+            aria-pressed={sv}
+            onClick={(e) => {
+              e.stopPropagation();
+              g.toggle("saved", post.id);
+            }}
+            data-active={sv}
+            className={cn(btn, "reaction reaction-save", sv && "text-primary")}
+          >
+            <Bookmark className={cn(sz, sv && "fill-current")} />
+          </button>
+        )}
         <button
           aria-label={g.lang === "ar" ? "مشاركة" : "Share"}
           onClick={(e) => {
@@ -292,10 +371,13 @@ function Tweet({
 }) {
   const g = useGallery();
   const a = g.profile(post.authorId);
+  const [expanded, setExpanded] = useState(false);
+  const text = post.caption[g.lang];
+  const long = text.length > 280 || text.split("\n").length > 10;
   return (
     <article
       onClick={onOpen}
-      className="cursor-pointer border-b border-border px-4 py-3 transition-colors active:bg-muted/40"
+      className="note-card relative cursor-pointer border-b border-border px-4 py-2.5 transition-colors active:bg-muted/40"
     >
       {g.state.reposted[post.id] && (
         <div className="mb-1 flex items-center gap-2 ps-8 text-[13px] font-bold text-muted-foreground">
@@ -303,7 +385,7 @@ function Tweet({
           {g.lang === "ar" ? "أعدت النشر" : "You reposted"}
         </div>
       )}
-      <div className="flex gap-3">
+      <div className="note-layout flex gap-2">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -314,16 +396,44 @@ function Tweet({
           <Avatar p={a} size={40} />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1 text-[15px] leading-5">
+          <div className="note-author flex items-center gap-1 text-[15px] leading-5">
             <span className="truncate font-bold">{a.name[g.lang]}</span>
             {a.verified && <Verified />}
-            <span className="truncate text-muted-foreground">
-              @{a.handle} · {timeAgo(post.createdAt, g.lang)}
+            <bdi dir="ltr" className="note-handle truncate text-muted-foreground">
+              @{a.handle}
+            </bdi>
+            <span className="shrink-0 text-muted-foreground">
+              · {timeAgo(post.createdAt, g.lang)}
             </span>
           </div>
-          <p dir="auto" className="whitespace-pre-wrap break-words text-[15px] leading-5">
-            {post.caption[g.lang]}
+          <p
+            dir="auto"
+            className={cn(
+              "note-text whitespace-pre-wrap break-words text-[16px] leading-[21px]",
+              long && !expanded && "note-collapsed",
+            )}
+          >
+            {text}
           </p>
+          {long && (
+            <button
+              aria-expanded={expanded}
+              className="note-more text-[15px] text-primary"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpanded((v) => !v);
+              }}
+            >
+              {g.lang === "ar"
+                ? expanded
+                  ? "عرض أقل"
+                  : "عرض المزيد"
+                : expanded
+                  ? "Show less"
+                  : "Show more"}
+            </button>
+          )}
+          {post.attachment && <NoteAttachment attachment={post.attachment} />}
           <NoteTools post={post} />
 
           <Actions post={post} onReply={onOpen} />
@@ -383,6 +493,7 @@ function Thread({
         <p dir="auto" className="mt-3 whitespace-pre-wrap break-words text-[17px] leading-6">
           {post.caption[g.lang]}
         </p>
+        {post.attachment && <NoteAttachment attachment={post.attachment} />}
         <NoteTools post={post} />
 
         <div className="py-4 text-[15px] text-muted-foreground">
@@ -497,7 +608,7 @@ function Reply({
       <div className="min-w-0 flex-1 pb-3">
         <div className="flex items-center gap-1 text-[15px]">
           <span className="font-bold">{a.name[g.lang]}</span>
-          <span className="truncate text-muted-foreground">
+          <span dir="ltr" className="truncate text-muted-foreground">
             @{a.handle} · {timeAgo(c.createdAt, g.lang)}
             {c.edited && ` · ${g.t("edited")}`}
           </span>
@@ -715,7 +826,7 @@ function XProfile({
   );
 }
 
-function NoteComposer({
+export function NoteComposer({
   open,
   onClose,
   note,
@@ -728,63 +839,193 @@ function NoteComposer({
 }) {
   const g = useGallery();
   const [editText, setEditText] = useState(note?.caption[g.lang] ?? "");
+  const [file, setFile] = useState<File | null>(null);
+  const [removed, setRemoved] = useState(false);
+  const [preview, setPreview] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submitting = useRef(false);
+  const input = useRef<HTMLInputElement>(null);
   const text = note ? editText : g.state.draft;
+  useEffect(() => {
+    if (!file) {
+      setPreview("");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+  // A cancelled selection is never written to IndexedDB.
+  const close = () => {
+    if (!submitting.current) {
+      setFile(null);
+      setRemoved(false);
+      setError("");
+      onClose();
+    }
+  };
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!text.trim() || submitting.current) return;
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    let added: Attachment | undefined;
+    try {
+      if (file) added = await saveNoteMedia(file);
+      g.saveNote(text, note?.id, quoteId, added ?? (removed ? null : undefined));
+      setFile(null);
+      setRemoved(false);
+      onClose();
+    } catch {
+      if (added) void deleteNoteMedia(added.id).catch(() => {});
+      setError(storageMessage());
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
+  };
   return (
     <BottomSheet
       open={open}
-      onClose={onClose}
+      onClose={close}
       title={g.lang === "ar" ? "ملاحظة شخصية" : "Personal note"}
-      className="h-[75%]"
+      className="h-[85%]"
     >
-      <form
-        className="flex min-h-0 flex-1 flex-col gap-4 p-4"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!text.trim()) return;
-          g.saveNote(text, note?.id, quoteId);
-          onClose();
-        }}
-      >
-        <div className="flex items-center justify-between">
-          <button type="button" onClick={onClose}>
+      <form onSubmit={submit} className="note-composer flex min-h-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-4 py-2">
+          <button type="button" disabled={busy} onClick={close}>
             {g.t("cancel")}
           </button>
           <button
-            disabled={!text.trim()}
-            className="rounded-full bg-primary px-5 py-2 font-bold text-primary-foreground disabled:opacity-40"
+            disabled={!text.trim() || busy}
+            className="rounded-full bg-primary px-5 py-1.5 font-bold text-primary-foreground disabled:opacity-40"
           >
-            {g.t("post")}
+            {busy ? (g.lang === "ar" ? "جار الحفظ…" : "Saving…") : g.t("post")}
           </button>
         </div>
-        <textarea
-          aria-label={g.t("whatsHappening")}
-          dir="auto"
-          maxLength={10000}
-          value={text}
-          onChange={(e) => (note ? setEditText(e.target.value) : g.set("draft", e.target.value))}
-          placeholder={g.t("whatsHappening")}
-          className="min-h-32 flex-1 resize-none bg-transparent text-xl outline-none"
-        />
-        {quoteId && (
-          <p className="rounded-xl border p-3 text-sm">
-            {g.notes.find((p) => p.id === quoteId)?.caption[g.lang] ??
-              (g.lang === "ar" ? "الملاحظة الأصلية حُذفت" : "Original note deleted")}
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <div className="flex gap-3">
+            <Avatar p={g.profile(ME)} size={40} />
+            <textarea
+              aria-label={g.t("whatsHappening")}
+              dir="auto"
+              maxLength={10000}
+              disabled={busy}
+              value={text}
+              onChange={(e) =>
+                note ? setEditText(e.target.value) : g.set("draft", e.target.value)
+              }
+              placeholder={g.t("whatsHappening")}
+              className="min-h-32 w-full resize-y bg-transparent text-xl outline-none"
+            />
+          </div>
+          {(file || (note?.attachment && !removed)) && (
+            <div className="relative mt-3">
+              <button
+                type="button"
+                disabled={busy}
+                aria-label="Remove attachment / إزالة المرفق"
+                onClick={() => {
+                  setFile(null);
+                  setRemoved(true);
+                }}
+                className="absolute end-2 top-2 z-10 flex size-9 items-center justify-center rounded-full bg-black/75 text-white"
+              >
+                <Close className="size-5" />
+              </button>
+              {file ? (
+                <div className="note-attachment">
+                  {file.type.startsWith("image/") ? (
+                    <img
+                      src={preview || undefined}
+                      alt={file.name}
+                      className="max-h-64 w-full object-contain"
+                    />
+                  ) : (
+                    <video
+                      src={preview || undefined}
+                      controls
+                      muted
+                      playsInline
+                      className="max-h-64 w-full"
+                    />
+                  )}
+                </div>
+              ) : (
+                note?.attachment && <NoteAttachment attachment={note.attachment} />
+              )}
+            </div>
+          )}
+          {quoteId && (
+            <p className="mt-3 rounded-xl border p-3 text-sm">
+              {g.notes.find((p) => p.id === quoteId)?.caption[g.lang] ??
+                (g.lang === "ar" ? "الملاحظة الأصلية حُذفت" : "Original note deleted")}
+            </p>
+          )}
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+        </div>
+        <div className="shrink-0 border-t border-border px-4 py-2">
+          <input
+            ref={input}
+            type="file"
+            hidden
+            accept="image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/ogg"
+            aria-label="Note attachment / مرفق الملاحظة"
+            disabled={busy}
+            onChange={(e) => {
+              const chosen = e.target.files?.[0];
+              e.target.value = "";
+              if (!chosen) return;
+              try {
+                validateNoteMedia(chosen);
+                setFile(chosen);
+                setRemoved(false);
+                setError("");
+              } catch (err) {
+                setError((err as Error).message);
+              }
+            }}
+          />
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => input.current?.click()}
+              className="flex items-center gap-2 text-sm font-semibold text-primary"
+            >
+              <ImagePlus className="size-5" />
+              {g.lang === "ar"
+                ? file || note?.attachment
+                  ? "استبدال المرفق"
+                  : "إرفاق صورة أو فيديو"
+                : file || note?.attachment
+                  ? "Replace attachment"
+                  : "Attach photo or video"}
+            </button>
+            <span className="text-xs text-muted-foreground">{text.length}/10000</span>
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {g.lang === "ar"
+              ? "على جهازك فقط · مرفق واحد حتى 50 ميغابايت · تُحفظ مسودة النص تلقائيًا"
+              : "Only on this device · one attachment up to 50 MB · text draft saved automatically"}
           </p>
-        )}
-        <p className="text-xs text-muted-foreground">
-          {g.lang === "ar"
-            ? "محفوظة على جهازك فقط · المسودة تُحفظ تلقائيًا"
-            : "Only on your device · draft saved automatically"}{" "}
-          · {text.length}/10000
-        </p>
+        </div>
       </form>
     </BottomSheet>
   );
 }
+
 function NoteTools({ post }: { post: Post }) {
   const g = useGallery();
   const [edit, setEdit] = useState(false);
   const [quote, setQuote] = useState(false);
+  const [tools, setTools] = useState(false);
   const original = post.quoteId ? g.notes.find((p) => p.id === post.quoteId) : null;
   return (
     <div onClick={(e) => e.stopPropagation()}>
@@ -797,17 +1038,60 @@ function NoteTools({ post }: { post: Post }) {
             (g.lang === "ar" ? "الملاحظة الأصلية حُذفت" : "Original note deleted")}
         </blockquote>
       )}
-      <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
-        <button onClick={() => setQuote(true)}>{g.lang === "ar" ? "اقتباس" : "Quote"}</button>
-        {post.authorId === ME && (
-          <>
-            <button onClick={() => setEdit(true)}>{g.t("edit")}</button>
-            <button className="text-destructive" onClick={() => g.deleteNote(post.id)}>
-              {g.t("delete")}
-            </button>
-          </>
-        )}
-      </div>
+      <button
+        onClick={() => setTools(true)}
+        aria-label={g.lang === "ar" ? "خيارات الملاحظة" : "Note options"}
+        className="note-options"
+      >
+        <MoreHorizontal className="size-5" />
+      </button>
+      <BottomSheet
+        open={tools}
+        onClose={() => setTools(false)}
+        title={g.lang === "ar" ? "خيارات الملاحظة" : "Note options"}
+      >
+        <div className="flex flex-col gap-2 p-4 text-start text-sm font-semibold">
+          <button
+            aria-pressed={!!g.state.saved[post.id]}
+            onClick={() => g.toggle("saved", post.id)}
+          >
+            {g.state.saved[post.id] ? g.t("saved") : g.t("save")}
+          </button>
+          <button
+            onClick={() => {
+              setTools(false);
+              setQuote(true);
+            }}
+          >
+            {g.lang === "ar" ? "اقتباس" : "Quote"}
+          </button>
+          {post.authorId === ME && (
+            <>
+              <button
+                onClick={() => {
+                  setTools(false);
+                  setEdit(true);
+                }}
+              >
+                {g.t("edit")}
+              </button>
+              <button
+                className="text-destructive"
+                onClick={() => {
+                  try {
+                    g.deleteNote(post.id);
+                    setTools(false);
+                  } catch {
+                    toast(storageMessage());
+                  }
+                }}
+              >
+                {g.t("delete")}
+              </button>
+            </>
+          )}
+        </div>
+      </BottomSheet>
       {edit && <NoteComposer open onClose={() => setEdit(false)} note={post} />}
       {quote && <NoteComposer open onClose={() => setQuote(false)} quoteId={post.id} />}
     </div>

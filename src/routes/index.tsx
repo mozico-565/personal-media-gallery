@@ -6,17 +6,18 @@ import { GalleryProvider, useGallery } from "@/gallery/store";
 import { PlatformSwitcher } from "@/gallery/switcher";
 import { TikTokMode } from "@/gallery/tiktok";
 import { XMode } from "@/gallery/x";
+import { xAccentStyle } from "@/gallery/x-accent";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Social Gallery V2 — personal offline gallery prototype" },
+      { title: "Social Gallery V3 — personal offline gallery prototype" },
       {
         name: "description",
         content:
           "Browse your personal gallery in Instagram, X and TikTok style views. Offline prototype with demo media.",
       },
-      { property: "og:title", content: "Social Gallery V2" },
+      { property: "og:title", content: "Social Gallery V3" },
       {
         property: "og:description",
         content: "A personal offline gallery prototype with three social-style views.",
@@ -44,6 +45,7 @@ function Phone() {
   return (
     <div
       data-mode={mode}
+      style={xAccentStyle(g.state.xAccent)}
       className={cn(
         "phone-frame relative overflow-hidden bg-background text-foreground",
         (mode !== "ig" || dark) && "dark",

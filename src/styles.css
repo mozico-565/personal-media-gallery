@@ -187,7 +187,8 @@
   --primary-foreground: oklch(1 0 0);
   --sheet: oklch(1 0 0);
 }
-[data-mode="ig"].dark {
+[data-mode="ig"].dark,
+.dark [data-mode="ig"] {
   --background: oklch(0 0 0);
   --foreground: oklch(0.96 0 0);
   --muted: oklch(0.2 0 0);
@@ -371,4 +372,641 @@ article p {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* V3: reference-led motion, shared geometry, no ornamental particles. */
+.platform-label {
+  font-family: "IBM Plex Sans Arabic", Arial, sans-serif;
+  font-size: 17px;
+  line-height: 28px;
+  font-weight: 600;
+}
+.platform-label-ig {
+  font-weight: 500;
+}
+.platform-label-tt {
+  font-weight: 700;
+}
+.sheet-layer {
+  isolation: isolate;
+}
+.sheet-backdrop {
+  animation: sheet-fade-in 220ms ease-out both;
+  touch-action: none;
+}
+.sheet-panel {
+  animation: sheet-enter 240ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  overscroll-behavior: contain;
+}
+.sheet-layer[data-exiting="true"] .sheet-panel {
+  animation: sheet-leave 180ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+.sheet-layer[data-exiting="true"] .sheet-backdrop {
+  animation: sheet-fade-out 180ms ease-in both;
+}
+.sheet-layer ~ [data-sonner-toaster] {
+  z-index: 60;
+}
+.phone-frame:has(> .sheet-layer) > div[data-mode],
+.phone-frame:has(> .sheet-layer) > button {
+  pointer-events: none;
+}
+.phone-frame:has(> .sheet-layer) main,
+.phone-frame:has(> .sheet-layer) [data-surface="media"] {
+  overflow-y: hidden;
+}
+.note-attachment {
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: oklch(0 0 0);
+}
+.note-attachment img,
+.note-attachment video {
+  display: block;
+}
+.note-options {
+  position: absolute;
+  inset-inline-end: 8px;
+  top: 4px;
+  width: 36px;
+  color: var(--muted-foreground);
+}
+.note-card > .flex > div > div:first-child {
+  padding-inline-end: 20px;
+}
+.x-type {
+  font-family: Arial, "IBM Plex Sans Arabic", sans-serif;
+}
+[dir="rtl"] .x-type {
+  font-family: "IBM Plex Sans Arabic", Arial, sans-serif;
+}
+.x-type header {
+  backdrop-filter: none;
+  background: var(--background);
+}
+.x-type .reaction {
+  min-height: 32px;
+}
+.reaction {
+  touch-action: manipulation;
+}
+.reaction svg {
+  transition:
+    scale 180ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    color 120ms ease-out,
+    fill 120ms ease-out;
+  transform-origin: center;
+}
+.reaction:active svg {
+  scale: 0.82;
+}
+.reaction[data-active="true"] svg {
+  animation: reaction-on 300ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.reaction[data-active="false"] svg {
+  animation: reaction-off 160ms ease-out;
+}
+.x-type .reaction[data-active="true"] svg {
+  animation-duration: 220ms;
+}
+.x-type .reaction[data-active="false"] svg {
+  animation-duration: 140ms;
+}
+.tt-type .reaction-save[data-active="true"] {
+  color: var(--tt-gold);
+}
+.ig-burst {
+  color: oklch(0.65 0.25 345);
+  animation: ig-heart 800ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+@keyframes reaction-on {
+  0% {
+    scale: 0.8;
+  }
+  45% {
+    scale: 1.18;
+  }
+  75% {
+    scale: 0.96;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes reaction-off {
+  0% {
+    scale: 0.85;
+  }
+  100% {
+    scale: 1;
+  }
+}
+@keyframes ig-heart {
+  0% {
+    opacity: 0;
+    scale: 0.25;
+    rotate: -16deg;
+    color: oklch(0.62 0.24 305);
+  }
+  20% {
+    opacity: 1;
+    scale: 1.1;
+    rotate: -8deg;
+  }
+  45% {
+    scale: 1;
+    color: oklch(0.65 0.25 345);
+  }
+  75% {
+    opacity: 1;
+    scale: 1;
+  }
+  100% {
+    opacity: 0;
+    scale: 0.9;
+    translate: 0 -18px;
+  }
+}
+@keyframes sheet-enter {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+@keyframes sheet-leave {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reaction svg,
+  .ig-burst,
+  .sheet-panel,
+  .sheet-backdrop {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.note-card > .flex > button {
+  align-self: flex-start;
+}
+.ig-type nav {
+  border-top-width: 1px;
+}
+.ig-type article > div:first-of-type {
+  font-size: 14px;
+}
+.ig-type header {
+  min-height: 48px;
+}
+.tt-type .reaction {
+  position: relative;
+}
+.tt-type .reaction-save[data-active="true"]::after {
+  content: "";
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  top: -1px;
+  left: calc(50% - 17px);
+  border: 2px solid var(--tt-gold);
+  border-radius: 50%;
+  pointer-events: none;
+  animation: tt-save-ring 300ms 330ms ease-out both;
+}
+@keyframes tt-save-ring {
+  0%,
+  30% {
+    opacity: 0;
+    scale: 0.7;
+  }
+  50% {
+    opacity: 0.9;
+    scale: 1.2;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tt-type .reaction-save::after {
+    display: none;
+  }
+}
+
+/* V3 visual accuracy pass: app chrome measured independently from Android's status bar. */
+.dark [data-mode="ig"],
+[data-mode="ig"].dark {
+  --background: oklch(0.166 0.012 240);
+  --secondary: oklch(0.29 0.009 240);
+  --border: oklch(0.26 0.008 240);
+}
+[data-mode="x"] {
+  --primary: var(--x-accent, oklch(0.72 0.19 55));
+  --primary-foreground: var(--x-accent-foreground, oklch(0 0 0));
+  --muted-foreground: oklch(0.53 0.005 250);
+}
+.ig-type,
+[dir="rtl"] .ig-type,
+.x-type,
+[dir="rtl"] .x-type {
+  font-family: Arial, "IBM Plex Sans Arabic", sans-serif;
+}
+.ig-header {
+  min-height: 52px;
+}
+@font-face {
+  font-family: GalleryGothic;
+  src: url("./assets/URWGothic-Book.otf") format("opentype");
+  font-display: swap;
+}
+.ig-wordmark {
+  font-family: GalleryGothic, Arial, sans-serif;
+  font-size: 27px;
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: -1.5px;
+}
+.ig-stories {
+  align-items: flex-end;
+  gap: 10px;
+  padding: 5px 12px 5px;
+  min-height: 108px;
+}
+.ig-story {
+  width: 78px;
+}
+.ig-story > span:first-child {
+  margin-bottom: 1px;
+}
+.ig-post-header {
+  height: 56px;
+}
+.ig-media {
+  background: oklch(0 0 0);
+}
+.ig-media > span {
+  inset-inline-start: auto;
+  inset-inline-end: 12px;
+}
+.ig-carousel-dots {
+  height: 24px;
+  align-items: center;
+}
+.bg-ig-carousel {
+  background: oklch(0.63 0.21 274);
+}
+.ig-actions {
+  height: 44px;
+  gap: 8px;
+}
+.ig-action-group {
+  gap: clamp(10px, 3.5vw, 18px);
+}
+.ig-actions button {
+  min-height: 44px;
+}
+.ig-actions svg {
+  stroke-width: 1.9;
+}
+.ig-caption {
+  padding-top: 0;
+}
+.ig-caption > button:first-child {
+  font-size: 13px;
+  min-height: 25px;
+}
+.ig-nav > div {
+  height: 55px;
+}
+.ig-nav svg {
+  stroke-width: 2.1;
+}
+.ig-burst {
+  animation-duration: 670ms;
+}
+.tt-header {
+  height: calc(62px + env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 12px;
+}
+.tt-live,
+.tt-search {
+  width: 36px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tt-live {
+  position: relative;
+}
+.tt-live span {
+  position: absolute;
+  top: 21px;
+  font:
+    800 8px/10px Arial,
+    sans-serif;
+  background: oklch(0 0 0);
+}
+.tt-tabs {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  justify-content: space-evenly;
+  gap: 8px;
+}
+.tt-feed-tab {
+  position: relative;
+  min-height: 44px;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0.55;
+  padding: 4px 0 11px;
+}
+.tt-feed-tab.selected {
+  opacity: 1;
+}
+.tt-feed-tab.selected::after {
+  content: "";
+  position: absolute;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  inset-inline: 4px;
+  bottom: 2px;
+}
+.tt-nav {
+  border-top: 1px solid oklch(0.3 0 0);
+}
+.tt-nav button {
+  min-width: 44px;
+}
+.tt-rail {
+  gap: 15px;
+  bottom: 14px;
+  inset-inline-end: 7px;
+}
+.tt-rail > button {
+  min-height: 49px;
+  gap: 2px;
+  font-size: 12.5px;
+  line-height: 16px;
+}
+.tt-rail > div {
+  margin-bottom: 4px;
+}
+.tt-rail > button:last-child {
+  min-height: 40px;
+  width: 40px;
+  height: 40px;
+  border-width: 5px;
+}
+.tt-rail .reaction > svg {
+  width: 34px;
+  height: 34px;
+}
+.tt-rail .reaction-save > svg {
+  width: 31px;
+  height: 31px;
+}
+.tt-caption {
+  inset-inline-start: 12px;
+  inset-inline-end: 67px;
+  bottom: 12px;
+  font:
+    16px/20px Arial,
+    "IBM Plex Sans Arabic",
+    sans-serif;
+}
+.tt-caption > div:first-child {
+  justify-content: flex-start;
+  font-size: 19px;
+  line-height: 25px;
+}
+.tt-caption > p {
+  margin-top: 4px;
+}
+.tt-type input[type="range"] {
+  opacity: 0.35;
+  height: 3px;
+}
+.tt-type input[type="range"]:hover,
+.tt-type input[type="range"]:focus-visible {
+  opacity: 1;
+  height: 16px;
+}
+.x-home-header {
+  height: 54px;
+}
+.x-header-tools {
+  min-height: 34px;
+  border: 1px solid oklch(0.48 0.01 240);
+  border-radius: 999px;
+  padding-inline: 15px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.x-feed-tabs {
+  height: 46px;
+  display: flex;
+  align-items: stretch;
+}
+.x-feed-tab {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: 15px;
+  white-space: nowrap;
+}
+.x-feed-tab.selected {
+  color: var(--foreground);
+  font-weight: 700;
+}
+.x-feed-tab.selected::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--primary);
+}
+.x-add-tab {
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+}
+.x-compose {
+  bottom: calc(69px + env(safe-area-inset-bottom));
+  inset-inline-end: 18px;
+  width: 55px;
+  height: 55px;
+}
+.x-nav > div {
+  height: 51px;
+}
+.note-card {
+  padding-inline: 16px;
+}
+.note-card .note-layout {
+  align-items: flex-start;
+}
+.note-card .note-author {
+  padding-inline-end: 12px;
+  white-space: nowrap;
+  gap: 4px;
+}
+.note-author > span:first-child {
+  flex-shrink: 0;
+  max-width: 45%;
+}
+.note-author .note-handle {
+  flex-shrink: 1;
+  min-width: 0;
+}
+.note-author > span:last-child {
+  font-size: 12px;
+}
+.note-text {
+  padding-top: 2px;
+}
+.note-collapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 8;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.note-more {
+  min-height: 25px !important;
+  display: block;
+}
+.note-options {
+  width: 28px;
+  min-height: 28px !important;
+  inset-inline-end: 10px;
+  top: 7px;
+}
+.note-options svg {
+  width: 18px;
+}
+.note-attachment {
+  border-radius: 16px;
+  margin-top: 10px;
+}
+.x-actions:not(.border-y) {
+  margin-top: 7px;
+  margin-inline-start: -48px;
+}
+.x-action {
+  min-height: 34px;
+}
+.x-actions > span:last-child {
+  gap: 0;
+}
+@media (max-width: 370px) {
+  .tt-feed-tab {
+    font-size: 16px;
+  }
+  .tt-tabs {
+    gap: 6px;
+  }
+  .note-author {
+    font-size: 14px;
+  }
+}
+
+.x-type [aria-label="verified"] {
+  fill: oklch(0.67 0.17 243);
+  color: oklch(0 0 0);
+}
+
+[data-mode="tt"] {
+  --tt-gold: oklch(0.88 0.18 97);
+  --like: oklch(0.64 0.24 14);
+}
+.tt-type .reaction-save[data-active="true"] svg {
+  animation: tt-save-on 700ms ease-out;
+}
+@keyframes tt-save-on {
+  0% {
+    scale: 0.85;
+  }
+  20% {
+    scale: 1.08;
+  }
+  32% {
+    scale: 1 0.5;
+  }
+  48% {
+    scale: 1.15;
+  }
+  70%,
+  100% {
+    scale: 1;
+  }
+}
+.tt-nav {
+  font-family: Arial, "IBM Plex Sans Arabic", sans-serif;
+}
+.tt-nav > div {
+  font-size: 12px;
+  line-height: 15px;
+}
+.tt-nav button > span {
+  white-space: nowrap;
+}
+/* Keep the compose affordance visible even when its chosen accent is black. */
+.x-compose {
+  border: 1px solid oklch(1 0 0 / 22%);
+}
+
+/* Keep the Arabic navigation labels within the screen. */
+.tt-rail .reaction > svg,
+.tt-rail > button[aria-label="comments"] > svg,
+.tt-rail > button[aria-label="share"] > svg {
+  width: 37px;
+  height: 37px;
+}
+.tt-nav > div {
+  padding-inline: 8px;
+}
+.tt-nav > div > button:not(.tt-add) {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.tt-nav button > span {
+  font-size: clamp(9px, 2.6vw, 11px);
 }

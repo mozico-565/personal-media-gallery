@@ -4,19 +4,23 @@ import {
   Bookmark,
   Heart,
   MessageCircle,
+  MessageCircleMore,
   Music2,
   Plus,
   Send,
+  Forward,
   Volume2,
   VolumeX,
   X,
   Play,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { fmtCount, timeAgo } from "./i18n";
 import { ME, useGallery } from "./store";
 import type { Comment, MediaItem, Post, Profile } from "./types";
+import { videoFit } from "./media-layout";
 
 export function Avatar({
   p,
@@ -81,22 +85,37 @@ export function BottomSheet({
   title,
   children,
   className,
+  swipeToDismiss = false,
 }: {
   open: boolean;
   onClose: () => void;
   title?: ReactNode;
   children: ReactNode;
   className?: string;
+  swipeToDismiss?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
+  const [mounted, setMounted] = useState(open);
   const close = useRef(onClose);
   close.current = onClose;
+  const dismiss = () => close.current();
+  const visible = open || mounted;
+  // Keep controlled sheets present until exit finishes. Reopening cancels cleanup.
   useEffect(() => {
-    if (!open) return;
+    if (open) {
+      setMounted(true);
+      return;
+    }
+    const delay = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 0 : 180;
+    const timer = setTimeout(() => setMounted(false), delay);
+    return () => clearTimeout(timer);
+  }, [open]);
+  useEffect(() => {
+    if (!visible) return;
     const previous = document.activeElement as HTMLElement | null;
     const el = ref.current;
-    el?.focus();
+    el?.focus({ preventScroll: true });
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.stopPropagation();
@@ -125,32 +144,92 @@ export function BottomSheet({
     el?.addEventListener("keydown", key);
     return () => {
       el?.removeEventListener("keydown", key);
-      previous?.focus();
+      if (document.activeElement === document.body || el?.contains(document.activeElement))
+        previous?.focus({ preventScroll: true });
     };
+  }, [visible]);
+  const gesture = useRef<{ id: number; y: number; time: number; distance: number } | null>(null);
+  const [dragDistance, setDragDistance] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [dragStarted, setDragStarted] = useState(false);
+  const resetDrag = () => {
+    gesture.current = null;
+    setDragging(false);
+    setDragDistance(0);
+  };
+  useEffect(() => {
+    if (open) {
+      resetDrag();
+      setDragStarted(false);
+    }
   }, [open]);
-  const start = useRef(0);
-  if (!open) return null;
-  return (
-    <div className="absolute inset-0 z-40">
-      <div onClick={onClose} className="absolute inset-0 bg-overlay animate-in fade-in" />
+  if (!visible) return null;
+  return createPortal(
+    <div
+      className="sheet-layer absolute inset-0 z-40"
+      data-exiting={!open}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        data-testid="sheet-backdrop"
+        onClick={dismiss}
+        className="sheet-backdrop absolute inset-0 bg-overlay"
+      />
       <div
         ref={ref}
         tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={id}
+        style={
+          open && dragStarted
+            ? {
+                transform: `translateY(${dragDistance}px)`,
+                animation: "none",
+                transition: dragging ? "none" : "transform 180ms ease-out",
+              }
+            : undefined
+        }
         className={cn(
-          "absolute inset-x-0 bottom-0 flex max-h-[90%] flex-col rounded-t-2xl bg-sheet text-sheet-foreground pb-safe shadow-sheet animate-in slide-in-from-bottom duration-200 outline-none",
+          "sheet-panel absolute inset-x-0 bottom-0 flex max-h-[90%] flex-col rounded-t-2xl bg-sheet text-sheet-foreground pb-safe shadow-sheet outline-none",
           className,
         )}
       >
         <div
-          onTouchStart={(e) => {
-            start.current = e.touches[0]!.clientY;
+          data-testid="sheet-drag-handle"
+          onPointerDown={(e) => {
+            if (!swipeToDismiss || !open) return;
+            if (gesture.current || !e.isPrimary) {
+              resetDrag();
+              return;
+            }
+            gesture.current = {
+              id: e.pointerId,
+              y: e.clientY,
+              time: performance.now(),
+              distance: 0,
+            };
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setDragStarted(true);
+            setDragging(true);
           }}
-          onTouchEnd={(e) => {
-            if (e.changedTouches[0]!.clientY - start.current > 70) onClose();
+          onPointerMove={(e) => {
+            const g = gesture.current;
+            if (!g || g.id !== e.pointerId) return;
+            g.distance = Math.max(0, e.clientY - g.y);
+            setDragDistance(g.distance);
           }}
+          onPointerUp={(e) => {
+            const g = gesture.current;
+            if (!g || g.id !== e.pointerId) return;
+            const elapsed = Math.max(1, performance.now() - g.time);
+            const shouldClose = g.distance > 80 || (g.distance > 30 && g.distance / elapsed > 0.6);
+            resetDrag();
+            if (shouldClose) dismiss();
+          }}
+          onPointerCancel={resetDrag}
+          onLostPointerCapture={resetDrag}
+          style={swipeToDismiss ? { touchAction: "none" } : undefined}
           className="flex min-h-6 items-center justify-center"
         >
           <span className="h-1 w-10 rounded-full bg-muted-foreground/40" />
@@ -159,7 +238,7 @@ export function BottomSheet({
           <span id={id}>{title}</span>
           <button
             aria-label="Close / إغلاق"
-            onClick={onClose}
+            onClick={dismiss}
             className="absolute end-2 top-0 flex size-9 items-center justify-center"
           >
             <X className="size-5" />
@@ -167,7 +246,8 @@ export function BottomSheet({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.querySelector(".phone-frame") ?? document.body,
   );
 }
 
@@ -379,15 +459,44 @@ export function MediaView({
   className,
   muted = true,
   paused,
+  smartFit = false,
 }: {
   m: MediaItem;
   active?: boolean;
   className?: string;
   muted?: boolean;
   paused?: boolean;
+  smartFit?: boolean;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
-  const [error, setError] = useState(false);
+  const box = useRef<HTMLDivElement>(null);
+  const [geometry, setGeometry] = useState({
+    width: m.width,
+    height: m.height,
+    boxWidth: 0,
+    boxHeight: 0,
+  });
+  useEffect(() => {
+    const el = box.current;
+    if (!smartFit || !el || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry)
+        setGeometry((g) => ({
+          ...g,
+          boxWidth: entry.contentRect.width,
+          boxHeight: entry.contentRect.height,
+        }));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [smartFit, m.src]);
+  const [error, setError] = useState<number | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    setError(null);
+    setBlocked(false);
+    setProgress(0);
+  }, [m.src]);
   const [blocked, setBlocked] = useState(false);
   const [progress, setProgress] = useState(0);
   const { lang, state } = useGallery();
@@ -408,22 +517,47 @@ export function MediaView({
       document.removeEventListener("visibilitychange", update);
       v.pause();
     };
-  }, [active, visibleMode, paused, m.src]);
+  }, [active, visibleMode, paused, m.src, attempt, error]);
   if (error)
     return (
       <div
         role="status"
-        className="flex h-full items-center justify-center bg-media p-6 text-center text-sm text-media-foreground"
+        className="flex h-full flex-col items-center justify-center bg-media p-6 text-center text-sm text-media-foreground"
       >
         {lang === "ar"
           ? "الملف غير متاح أو تنسيقه غير مدعوم"
           : "Media unavailable or unsupported format"}
+        {m.kind === "video" && (
+          <div className="mt-3 flex flex-col items-center gap-3">
+            <span>
+              {lang === "ar"
+                ? error === 4
+                  ? "قد لا يدعم المتصفح صيغة الفيديو، أو تعذر تحميل المصدر."
+                  : "تعذر تحميل الفيديو. تحقق من الاتصال أو اختر ملفًا متوافقًا."
+                : error === 4
+                  ? "The format may be unsupported, or the source could not be loaded."
+                  : "Could not load video. Check your connection or choose a compatible file."}
+            </span>
+            <button
+              className="rounded-lg bg-white px-4 py-2 text-black"
+              onClick={(e) => {
+                e.stopPropagation();
+                setError(null);
+                setBlocked(false);
+                setAttempt((n) => n + 1);
+              }}
+            >
+              {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+            </button>
+          </div>
+        )}
       </div>
     );
   if (m.kind === "video")
     return (
-      <div className="relative h-full w-full">
+      <div ref={box} className="relative h-full w-full">
         <video
+          key={`${m.src}-${attempt}`}
           ref={ref}
           src={m.src}
           poster={m.poster}
@@ -431,12 +565,28 @@ export function MediaView({
           loop
           playsInline
           preload={active ? "metadata" : "none"}
-          onError={() => setError(true)}
+          onLoadedMetadata={(e) => {
+            const { videoWidth: width, videoHeight: height } = e.currentTarget;
+            setGeometry((g) => ({ ...g, width, height }));
+          }}
+          onError={(e) => setError(e.currentTarget.error?.code ?? 4)}
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             setProgress(v.duration ? (v.currentTime / v.duration) * 100 : 0);
           }}
           className={cn("h-full w-full object-cover", className)}
+          style={
+            smartFit
+              ? {
+                  objectFit: videoFit(
+                    geometry.width,
+                    geometry.height,
+                    geometry.boxWidth,
+                    geometry.boxHeight,
+                  ),
+                }
+              : undefined
+          }
         />
         {blocked && active && (
           <button
@@ -446,7 +596,7 @@ export function MediaView({
               ref.current
                 ?.play()
                 .then(() => setBlocked(false))
-                .catch(() => setError(true));
+                .catch(() => setBlocked(true));
             }}
             className="absolute inset-0 m-auto flex size-16 items-center justify-center rounded-full bg-overlay text-white"
           >
@@ -476,7 +626,7 @@ export function MediaView({
     <img
       src={m.src}
       alt={lang === "ar" ? "صورة من المعرض" : "Gallery photo"}
-      onError={() => setError(true)}
+      onError={() => setError(4)}
       draggable={false}
       loading="lazy"
       className={cn("h-full w-full object-cover", className)}
@@ -500,15 +650,20 @@ export function VerticalFeed({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [muted, setMuted] = useState(true);
+  const firstPostId = posts[0]?.id;
   useEffect(() => {
     const el = ref.current;
     if (el) el.scrollTop = initialIndex * el.clientHeight;
-  }, [initialIndex]);
+  }, [initialIndex, firstPostId]);
   return (
     <div
       ref={ref}
       className="h-full snap-y snap-mandatory overflow-y-scroll overscroll-contain no-scrollbar bg-media"
       data-surface="media"
+      tabIndex={0}
+      role="region"
+      aria-label={variant === "tt" ? "Video feed / الفيديوهات" : "Photo feed / الصور"}
+      style={{ overflowAnchor: "none" }}
     >
       {!posts.length && (
         <p
@@ -555,6 +710,8 @@ function Slide({
   const [idx, setIdx] = useState(0);
   const [burst, setBurst] = useState(0);
   const lastTap = useRef(0);
+  const touchStart = useRef({ x: 0, y: 0 });
+  const moved = useRef(false);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(tapTimer.current), []);
   const author = g.profile(post.authorId);
@@ -574,11 +731,17 @@ function Slide({
   }, []);
 
   const onTap = () => {
+    if (moved.current) {
+      lastTap.current = 0;
+      return;
+    }
     const now = Date.now();
     clearTimeout(tapTimer.current);
     if (now - lastTap.current < 280) {
       g.toggle("liked", post.id, true);
       setBurst((b) => b + 1);
+      lastTap.current = 0;
+      return;
     } else
       tapTimer.current = setTimeout(() => {
         if (Date.now() - lastTap.current >= 280 && hasVideo) setPaused((p) => !p);
@@ -586,7 +749,8 @@ function Slide({
     lastTap.current = now;
   };
 
-  const railBtn = "flex flex-col items-center gap-1 text-[12px] font-semibold drop-shadow-media";
+  const railBtn =
+    "relative min-w-11 min-h-11 flex flex-col items-center gap-1 text-[12px] font-semibold drop-shadow-media";
   const iconCls = variant === "tt" ? "size-8 fill-media-foreground" : "size-7";
   return (
     <section
@@ -595,6 +759,16 @@ function Slide({
     >
       <div
         className="absolute inset-0 flex snap-x snap-mandatory overflow-x-auto no-scrollbar"
+        onPointerDown={(e) => {
+          touchStart.current = { x: e.clientX, y: e.clientY };
+          moved.current = false;
+        }}
+        onPointerMove={(e) => {
+          if (Math.hypot(e.clientX - touchStart.current.x, e.clientY - touchStart.current.y) > 10) {
+            moved.current = true;
+            clearTimeout(tapTimer.current);
+          }
+        }}
         onClick={onTap}
         onScroll={(e) =>
           setIdx(Math.round(Math.abs(e.currentTarget.scrollLeft) / e.currentTarget.clientWidth))
@@ -602,11 +776,17 @@ function Slide({
       >
         {post.media.map((m, i) => (
           <div key={m.id + i} className="h-full w-full shrink-0 snap-center">
-            <MediaView m={m} active={active && i === idx} muted={muted} paused={paused} />
+            <MediaView
+              m={m}
+              active={active && i === idx}
+              muted={muted}
+              paused={paused}
+              smartFit={variant === "tt"}
+            />
           </div>
         ))}
       </div>
-      <div className="pointer-events-none absolute inset-0 bg-media-scrim" />
+      {variant !== "tt" && <div className="pointer-events-none absolute inset-0 bg-media-scrim" />}
       {burst > 0 && (
         <Heart
           key={burst}
@@ -630,11 +810,16 @@ function Slide({
         </div>
       )}
 
-      <div className="absolute bottom-4 end-2 flex flex-col items-center gap-5">
+      <div
+        className={cn(
+          "video-rail absolute bottom-4 end-2 flex flex-col items-center gap-5",
+          variant === "tt" && "tt-rail",
+        )}
+      >
         {variant === "tt" && (
           <div className="relative mb-2">
             <button onClick={() => onProfile(author.id)}>
-              <Avatar p={author} size={48} className="border-2 border-media-foreground" />
+              <Avatar p={author} size={46} className="border border-media-foreground" />
             </button>
             {!author.isMe && !g.state.following[author.id] && (
               <button
@@ -647,7 +832,13 @@ function Slide({
             )}
           </div>
         )}
-        <button className={railBtn} onClick={() => g.toggle("liked", post.id)} aria-label="like">
+        <button
+          className={cn(railBtn, "reaction reaction-like")}
+          data-active={liked}
+          aria-pressed={liked}
+          onClick={() => g.toggle("liked", post.id)}
+          aria-label="like"
+        >
           <Heart
             className={cn(
               iconCls,
@@ -659,13 +850,26 @@ function Slide({
           {fmtCount(g.likeCount(post), g.lang)}
         </button>
         <button className={railBtn} onClick={() => onComments(post.id)} aria-label="comments">
-          <MessageCircle
-            className={cn(iconCls, variant === "ig" && "-scale-x-100")}
-            strokeWidth={variant === "tt" ? 0 : 2}
-          />
+          {variant === "tt" ? (
+            <MessageCircleMore
+              className="size-8 fill-media-foreground text-black"
+              strokeWidth={1.8}
+            />
+          ) : (
+            <MessageCircle
+              className={cn(iconCls, variant === "ig" && "-scale-x-100")}
+              strokeWidth={2}
+            />
+          )}
           {fmtCount(g.commentsFor(post.id).length, g.lang)}
         </button>
-        <button className={railBtn} onClick={() => g.toggle("saved", post.id)} aria-label="save">
+        <button
+          className={cn(railBtn, "reaction reaction-save")}
+          data-active={saved}
+          aria-pressed={saved}
+          onClick={() => g.toggle("saved", post.id)}
+          aria-label="save"
+        >
           <Bookmark
             className={cn(
               iconCls,
@@ -676,27 +880,37 @@ function Slide({
           {variant === "tt" && fmtCount(post.baseReposts + (saved ? 1 : 0), g.lang)}
         </button>
         <button className={railBtn} onClick={() => toast(g.t("shareSimulated"))} aria-label="share">
-          <Send
-            className={cn(variant === "tt" ? "size-7 fill-media-foreground" : "size-7")}
-            strokeWidth={variant === "tt" ? 1 : 2}
-          />
+          {variant === "tt" ? (
+            <Forward className="size-8 fill-media-foreground" strokeWidth={1.5} />
+          ) : (
+            <Send className="size-7" />
+          )}
+          {variant === "tt" && fmtCount(post.baseReposts, g.lang)}
         </button>
-        {hasVideo && (
+        {hasVideo && variant !== "tt" && (
           <button className={railBtn} onClick={() => setMuted(!muted)} aria-label="mute">
             {muted ? <VolumeX className="size-6" /> : <Volume2 className="size-6" />}
           </button>
         )}
-        <span
+        <button
+          onClick={() => setMuted(!muted)}
+          aria-label="mute"
+          title={muted ? "Unmute / تشغيل الصوت" : "Mute / كتم الصوت"}
           className={cn(
             "size-9 overflow-hidden border-[6px] border-media-foreground/20",
             variant === "tt" ? "animate-spin-slow rounded-full" : "rounded-md",
           )}
         >
           <img src={author.avatar} alt="" className="h-full w-full object-cover" />
-        </span>
+        </button>
       </div>
 
-      <div className="absolute bottom-4 start-3 end-20 space-y-1.5 text-[14.5px] drop-shadow-media">
+      <div
+        className={cn(
+          "video-caption absolute bottom-4 start-3 end-20 space-y-1.5 text-[14.5px] drop-shadow-media",
+          variant === "tt" && "tt-caption",
+        )}
+      >
         <div className="flex items-center gap-2">
           {variant === "ig" && (
             <button onClick={() => onProfile(author.id)}>
@@ -715,10 +929,17 @@ function Slide({
               {g.state.following[author.id] ? g.t("followingBtn") : g.t("follow")}
             </button>
           )}
-          <DemoChip />
+          {variant !== "tt" && <DemoChip />}
         </div>
-        <p className="line-clamp-2 leading-snug">{post.caption[g.lang]}</p>
-        <div className="flex items-center gap-1.5 text-[13px] opacity-90">
+        <p dir="auto" className="line-clamp-2 leading-snug">
+          {post.caption[g.lang]}
+        </p>
+        <div
+          className={cn(
+            "flex items-center gap-1.5 text-[13px] opacity-90",
+            variant === "tt" && "sr-only",
+          )}
+        >
           <Music2 className="size-3.5" />
           <span className="truncate">
             {author.handle} · {g.t("originalSound")}

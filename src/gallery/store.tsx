@@ -6,12 +6,23 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import { translate, type TKey } from "./i18n";
 import { readLocalMedia, saveLocalMedia } from "./local-media";
+import { deleteNoteMedia } from "./note-media";
 import { sampleRepository } from "./sample-repository";
-import type { Comment, GalleryRepository, Lang, Mode, Post, Profile } from "./types";
+import { DEFAULT_X_ACCENT, validAccent } from "./x-accent";
+import type {
+  Comment,
+  GalleryRepository,
+  Lang,
+  Mode,
+  NoteAttachment,
+  Post,
+  Profile,
+} from "./types";
 
 export const STORAGE_KEY = "social-gallery-v1";
 export const ME = "me";
@@ -24,6 +35,7 @@ export type GalleryState = {
   mode: Mode;
   lang: Lang;
   dark: boolean;
+  xAccent: string;
   liked: Flags;
   saved: Flags;
   reposted: Flags;
@@ -40,6 +52,7 @@ const defaults = (repo: GalleryRepository): GalleryState => ({
   mode: "ig",
   lang: "en",
   dark: false,
+  xAccent: DEFAULT_X_ACCENT,
   liked: {},
   saved: {},
   reposted: {},
@@ -75,6 +88,7 @@ function load(repo: GalleryRepository): GalleryState {
       if (!Array.isArray(merged.comments)) merged.comments = base.comments;
       if (!Array.isArray(merged.notes)) merged.notes = [];
       if (typeof merged.draft !== "string") merged.draft = "";
+      if (!validAccent(merged.xAccent)) merged.xAccent = DEFAULT_X_ACCENT;
       if (!["ig", "tt", "x"].includes(merged.mode)) merged.mode = base.mode;
       if (!["en", "ar"].includes(merged.lang)) merged.lang = base.lang;
       return merged;
@@ -89,10 +103,16 @@ function useGalleryApi(repo: GalleryRepository) {
   const [data] = useState(() => ({ profiles: repo.getProfiles(), posts: repo.getPosts() }));
   const [state, setState] = useState<GalleryState>(() => load(repo));
 
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const [localPosts, setLocalPosts] = useState<Post[]>([]);
+  const importedUrls = useRef(new Set<string>());
+  const mounted = useRef(false);
   const [storageError, setStorageError] = useState(false);
   useEffect(() => {
     let alive = true;
+    mounted.current = true;
+    const ownedImportedUrls = importedUrls.current;
     let urls: string[] = [];
     readLocalMedia()
       .then((posts) => {
@@ -106,7 +126,10 @@ function useGalleryApi(repo: GalleryRepository) {
       .catch(() => setStorageError(true));
     return () => {
       alive = false;
+      mounted.current = false;
       urls.forEach(URL.revokeObjectURL);
+      ownedImportedUrls.forEach(URL.revokeObjectURL);
+      ownedImportedUrls.clear();
     };
   }, []);
   useEffect(() => {
@@ -119,41 +142,68 @@ function useGalleryApi(repo: GalleryRepository) {
   }, [state]);
   const importMedia = useCallback(async (files: File[]) => {
     const posts = await saveLocalMedia(files);
+    const urls = posts.flatMap((post) => post.media.map((media) => media.src));
+    if (!mounted.current) {
+      urls.forEach(URL.revokeObjectURL);
+      return;
+    }
+    urls.forEach((url) => importedUrls.current.add(url));
     setLocalPosts((s) => [...posts, ...s]);
   }, []);
-  const saveNote = useCallback((text: string, id?: string, quoteId?: string) => {
-    if (!text.trim()) return;
-    setState((s) => {
-      if (id)
-        return {
-          ...s,
-          notes: s.notes.map((p) =>
-            p.id === id ? { ...p, caption: { en: text.trim(), ar: text.trim() } } : p,
-          ),
-        };
-      const note: Post = {
-        id: createLocalId(),
-        authorId: ME,
-        media: [],
-        caption: { en: text.trim(), ar: text.trim() },
-        createdAt: Date.now(),
-        baseLikes: 0,
-        baseReposts: 0,
-        views: 0,
-        quoteId,
-      };
-      return { ...s, draft: "", notes: [note, ...s.notes] };
-    });
-  }, []);
-  const deleteNote = useCallback(
-    (id: string) =>
-      setState((s) => ({
+  // Commit metadata before reporting success or deleting the previous blob.
+  const saveNote = useCallback(
+    (text: string, id?: string, quoteId?: string, attachment?: NoteAttachment | null) => {
+      if (!text.trim()) return;
+      const s = stateRef.current;
+      const old = id ? s.notes.find((p) => p.id === id) : undefined;
+      const note: Post = old
+        ? { ...old, caption: { en: text.trim(), ar: text.trim() } }
+        : {
+            id: createLocalId(),
+            authorId: ME,
+            media: [],
+            caption: { en: text.trim(), ar: text.trim() },
+            createdAt: Date.now(),
+            baseLikes: 0,
+            baseReposts: 0,
+            views: 0,
+            quoteId,
+          };
+      if (attachment !== undefined) {
+        if (attachment === null) delete note.attachment;
+        else note.attachment = attachment;
+      }
+      const next = {
         ...s,
-        notes: s.notes.filter((p) => p.id !== id),
-        comments: s.comments.filter((c) => c.postId !== id),
-      })),
+        draft: id ? s.draft : "",
+        notes: id ? s.notes.map((p) => (p.id === id ? note : p)) : [note, ...s.notes],
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      stateRef.current = next;
+      setState(next);
+      if (
+        old?.attachment &&
+        old.attachment.id !== note.attachment?.id &&
+        !next.notes.some((p) => p.attachment?.id === old.attachment!.id)
+      )
+        void deleteNoteMedia(old.attachment.id).catch(() => {});
+    },
     [],
   );
+  const deleteNote = useCallback((id: string) => {
+    const s = stateRef.current;
+    const old = s.notes.find((p) => p.id === id);
+    const next = {
+      ...s,
+      notes: s.notes.filter((p) => p.id !== id),
+      comments: s.comments.filter((c) => c.postId !== id),
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    stateRef.current = next;
+    setState(next);
+    if (old?.attachment && !next.notes.some((p) => p.attachment?.id === old.attachment!.id))
+      void deleteNoteMedia(old.attachment.id).catch(() => {});
+  }, []);
   useEffect(() => {
     document.documentElement.lang = state.lang;
     document.documentElement.dir = state.lang === "ar" ? "rtl" : "ltr";
@@ -201,7 +251,14 @@ function useGalleryApi(repo: GalleryRepository) {
     [],
   );
   const reset = useCallback(
-    () => setState((s) => ({ ...defaults(repo), mode: s.mode, lang: s.lang, dark: s.dark })),
+    () =>
+      setState((s) => ({
+        ...defaults(repo),
+        mode: s.mode,
+        lang: s.lang,
+        dark: s.dark,
+        xAccent: s.xAccent,
+      })),
     [repo],
   );
 

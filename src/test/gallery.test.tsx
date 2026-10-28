@@ -95,7 +95,7 @@ describe("Content separation and saved data", () => {
 });
 
 describe("Real UI interactions", () => {
-  it("composes and edits text notes without rendering media, keeping a draft on close", () => {
+  it("composes and edits text notes without rendering media, keeping a draft on close", async () => {
     render(<XMode />, { wrapper });
     fireEvent.click(screen.getByLabelText("compose"));
     const input = screen.getByRole("textbox");
@@ -103,14 +103,16 @@ describe("Real UI interactions", () => {
     fireEvent.click(screen.getByRole("button", { name: "Post" }));
     expect(screen.getByText("My private note")).toBeInTheDocument();
     expect(document.querySelector("video")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Note options" }));
     fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Note options" })).toBeNull());
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Edited note" } });
     fireEvent.click(screen.getByRole("button", { name: "Post" }));
     expect(screen.getByText("Edited note")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("compose"));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Draft" } });
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(screen.getByLabelText("compose"));
     expect(screen.getByRole("textbox")).toHaveValue("Draft");
   });
@@ -134,16 +136,17 @@ describe("Real UI interactions", () => {
     );
     render(<XMode />, { wrapper });
     fireEvent.click(screen.getByText("Thread note"));
+    fireEvent.click(screen.getByRole("button", { name: "Note options" }));
     fireEvent.click(screen.getByRole("button", { name: "Delete" }));
     expect(screen.getByText("Note deleted")).toBeInTheDocument();
   });
-  it("closes note sheets with Escape and restores compose focus", () => {
+  it("closes note sheets with Escape and restores compose focus", async () => {
     render(<XMode />, { wrapper });
     const compose = screen.getByLabelText("compose");
     compose.focus();
     fireEvent.click(compose);
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-    expect(screen.queryByRole("dialog")).toBeNull();
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(compose).toHaveFocus();
   });
   it("renders no video in Instagram and no photo slide in TikTok", () => {
