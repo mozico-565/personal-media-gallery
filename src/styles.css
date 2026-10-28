@@ -509,7 +509,7 @@ article p {
     opacity: 0;
     scale: 0.25;
     rotate: -16deg;
-    color: oklch(0.77 0.2 55);
+    color: oklch(0.62 0.24 305);
   }
   20% {
     opacity: 1;
@@ -596,7 +596,7 @@ article p {
   border: 2px solid var(--tt-gold);
   border-radius: 50%;
   pointer-events: none;
-  animation: tt-save-ring 440ms ease-out both;
+  animation: tt-save-ring 300ms 330ms ease-out both;
 }
 @keyframes tt-save-ring {
   0%,
@@ -617,4 +617,373 @@ article p {
   .tt-type .reaction-save::after {
     display: none;
   }
+}
+
+/* V3 visual accuracy pass: app chrome measured independently from Android's status bar. */
+.dark [data-mode="ig"],
+[data-mode="ig"].dark {
+  --background: oklch(0.166 0.012 240);
+  --secondary: oklch(0.29 0.009 240);
+  --border: oklch(0.26 0.008 240);
+}
+[data-mode="x"] {
+  --primary: var(--x-accent, oklch(0.72 0.19 55));
+  --primary-foreground: var(--x-accent-foreground, oklch(0 0 0));
+  --muted-foreground: oklch(0.53 0.005 250);
+}
+.ig-type,
+[dir="rtl"] .ig-type,
+.x-type,
+[dir="rtl"] .x-type {
+  font-family: Arial, "IBM Plex Sans Arabic", sans-serif;
+}
+.ig-header {
+  min-height: 52px;
+}
+.ig-wordmark {
+  font-family: Arial, sans-serif;
+  font-size: 27px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: -1.5px;
+}
+.ig-stories {
+  align-items: flex-end;
+  gap: 10px;
+  padding: 5px 12px 5px;
+  min-height: 120px;
+}
+.ig-story {
+  width: 88px;
+}
+.ig-story > span:first-child {
+  margin-bottom: 1px;
+}
+.ig-post-header {
+  height: 56px;
+}
+.ig-media {
+  background: oklch(0 0 0);
+}
+.ig-media > span {
+  inset-inline-start: auto;
+  inset-inline-end: 12px;
+}
+.ig-carousel-dots {
+  height: 24px;
+  align-items: center;
+}
+.bg-ig-carousel {
+  background: oklch(0.63 0.21 274);
+}
+.ig-actions {
+  height: 44px;
+  gap: 8px;
+}
+.ig-action-group {
+  gap: clamp(10px, 3.5vw, 18px);
+}
+.ig-actions button {
+  min-height: 44px;
+}
+.ig-actions svg {
+  stroke-width: 1.9;
+}
+.ig-caption {
+  padding-top: 0;
+}
+.ig-caption > button:first-child {
+  font-size: 13px;
+  min-height: 25px;
+}
+.ig-nav > div {
+  height: 55px;
+}
+.ig-nav svg {
+  stroke-width: 2.1;
+}
+.ig-burst {
+  animation-duration: 670ms;
+}
+.tt-header {
+  height: calc(62px + env(safe-area-inset-top));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 12px;
+}
+.tt-live,
+.tt-search {
+  width: 36px;
+  height: 44px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.tt-live {
+  position: relative;
+}
+.tt-live span {
+  position: absolute;
+  top: 21px;
+  font:
+    800 8px/10px Arial,
+    sans-serif;
+  background: oklch(0 0 0);
+}
+.tt-tabs {
+  min-width: 0;
+  display: flex;
+  flex: 1;
+  justify-content: space-evenly;
+  gap: 8px;
+}
+.tt-feed-tab {
+  position: relative;
+  min-height: 44px;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  opacity: 0.55;
+  padding: 4px 0 11px;
+}
+.tt-feed-tab.selected {
+  opacity: 1;
+}
+.tt-feed-tab.selected::after {
+  content: "";
+  position: absolute;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  inset-inline: 4px;
+  bottom: 2px;
+}
+.tt-nav {
+  border-top: 1px solid oklch(0.3 0 0);
+}
+.tt-nav button {
+  min-width: 44px;
+}
+.tt-rail {
+  gap: 15px;
+  bottom: 14px;
+  inset-inline-end: 7px;
+}
+.tt-rail > button {
+  min-height: 49px;
+  gap: 2px;
+  font-size: 12.5px;
+  line-height: 16px;
+}
+.tt-rail > div {
+  margin-bottom: 4px;
+}
+.tt-rail > button:last-child {
+  min-height: 40px;
+  width: 40px;
+  height: 40px;
+  border-width: 5px;
+}
+.tt-rail .reaction > svg {
+  width: 34px;
+  height: 34px;
+}
+.tt-rail .reaction-save > svg {
+  width: 31px;
+  height: 31px;
+}
+.tt-caption {
+  inset-inline-start: 12px;
+  inset-inline-end: 67px;
+  bottom: 12px;
+  font:
+    16px/20px Arial,
+    "IBM Plex Sans Arabic",
+    sans-serif;
+}
+.tt-caption > div:first-child {
+  justify-content: flex-start;
+  font-size: 19px;
+  line-height: 25px;
+}
+.tt-caption > p {
+  margin-top: 4px;
+}
+.tt-type input[type="range"] {
+  opacity: 0.35;
+  height: 3px;
+}
+.tt-type input[type="range"]:hover,
+.tt-type input[type="range"]:focus-visible {
+  opacity: 1;
+  height: 16px;
+}
+.x-home-header {
+  height: 54px;
+}
+.x-header-tools {
+  min-height: 34px;
+  border: 1px solid oklch(0.48 0.01 240);
+  border-radius: 999px;
+  padding-inline: 15px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.x-feed-tabs {
+  height: 46px;
+  display: flex;
+  align-items: stretch;
+}
+.x-feed-tab {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  color: var(--muted-foreground);
+  font-size: 15px;
+  white-space: nowrap;
+}
+.x-feed-tab.selected {
+  color: var(--foreground);
+  font-weight: 700;
+}
+.x-feed-tab.selected::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 4px;
+  border-radius: 4px;
+  background: var(--primary);
+}
+.x-add-tab {
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+}
+.x-compose {
+  bottom: calc(69px + env(safe-area-inset-bottom));
+  inset-inline-end: 18px;
+  width: 55px;
+  height: 55px;
+}
+.x-nav > div {
+  height: 51px;
+}
+.note-card {
+  padding-inline: 16px;
+}
+.note-card .note-layout {
+  align-items: flex-start;
+}
+.note-card .note-author {
+  padding-inline-end: 12px;
+  white-space: nowrap;
+  gap: 4px;
+}
+.note-author > span:first-child {
+  flex-shrink: 0;
+  max-width: 45%;
+}
+.note-author .note-handle {
+  flex-shrink: 1;
+  min-width: 0;
+}
+.note-author > span:last-child {
+  font-size: 12px;
+}
+.note-text {
+  padding-top: 2px;
+}
+.note-collapsed {
+  display: -webkit-box;
+  -webkit-line-clamp: 8;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.note-more {
+  min-height: 25px !important;
+  display: block;
+}
+.note-options {
+  width: 28px;
+  min-height: 28px !important;
+  inset-inline-end: 10px;
+  top: 7px;
+}
+.note-options svg {
+  width: 18px;
+}
+.note-attachment {
+  border-radius: 16px;
+  margin-top: 10px;
+}
+.x-actions:not(.border-y) {
+  margin-top: 7px;
+  margin-inline-start: -48px;
+}
+.x-action {
+  min-height: 34px;
+}
+.x-actions > span:last-child {
+  gap: 0;
+}
+@media (max-width: 370px) {
+  .tt-feed-tab {
+    font-size: 16px;
+  }
+  .tt-tabs {
+    gap: 6px;
+  }
+  .note-author {
+    font-size: 14px;
+  }
+}
+
+.x-type [aria-label="verified"] {
+  fill: oklch(0.67 0.17 243);
+  color: oklch(0 0 0);
+}
+
+[data-mode="tt"] {
+  --tt-gold: oklch(0.88 0.18 97);
+  --like: oklch(0.64 0.24 14);
+}
+.tt-type .reaction-save[data-active="true"] svg {
+  animation: tt-save-on 700ms ease-out;
+}
+@keyframes tt-save-on {
+  0% {
+    scale: 0.85;
+  }
+  20% {
+    scale: 1.08;
+  }
+  32% {
+    scale: 1 0.5;
+  }
+  48% {
+    scale: 1.15;
+  }
+  70%,
+  100% {
+    scale: 1;
+  }
+}
+.tt-nav {
+  font-family: Arial, "IBM Plex Sans Arabic", sans-serif;
+}
+.tt-nav > div {
+  font-size: 12px;
+  line-height: 15px;
+}
+.tt-nav button > span {
+  white-space: nowrap;
+}
+/* Keep the compose affordance visible even when its chosen accent is black. */
+.x-compose {
+  border: 1px solid oklch(1 0 0 / 22%);
 }
