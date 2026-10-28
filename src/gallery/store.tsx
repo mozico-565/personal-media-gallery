@@ -106,9 +106,13 @@ function useGalleryApi(repo: GalleryRepository) {
   const stateRef = useRef(state);
   stateRef.current = state;
   const [localPosts, setLocalPosts] = useState<Post[]>([]);
+  const importedUrls = useRef(new Set<string>());
+  const mounted = useRef(false);
   const [storageError, setStorageError] = useState(false);
   useEffect(() => {
     let alive = true;
+    mounted.current = true;
+    const ownedImportedUrls = importedUrls.current;
     let urls: string[] = [];
     readLocalMedia()
       .then((posts) => {
@@ -122,7 +126,10 @@ function useGalleryApi(repo: GalleryRepository) {
       .catch(() => setStorageError(true));
     return () => {
       alive = false;
+      mounted.current = false;
       urls.forEach(URL.revokeObjectURL);
+      ownedImportedUrls.forEach(URL.revokeObjectURL);
+      ownedImportedUrls.clear();
     };
   }, []);
   useEffect(() => {
@@ -135,6 +142,12 @@ function useGalleryApi(repo: GalleryRepository) {
   }, [state]);
   const importMedia = useCallback(async (files: File[]) => {
     const posts = await saveLocalMedia(files);
+    const urls = posts.flatMap((post) => post.media.map((media) => media.src));
+    if (!mounted.current) {
+      urls.forEach(URL.revokeObjectURL);
+      return;
+    }
+    urls.forEach((url) => importedUrls.current.add(url));
     setLocalPosts((s) => [...posts, ...s]);
   }, []);
   // Commit metadata before reporting success or deleting the previous blob.

@@ -85,12 +85,14 @@ export function BottomSheet({
   title,
   children,
   className,
+  swipeToDismiss = false,
 }: {
   open: boolean;
   onClose: () => void;
   title?: ReactNode;
   children: ReactNode;
   className?: string;
+  swipeToDismiss?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -146,7 +148,21 @@ export function BottomSheet({
         previous?.focus({ preventScroll: true });
     };
   }, [visible]);
-  const start = useRef(0);
+  const gesture = useRef<{ id: number; y: number; time: number; distance: number } | null>(null);
+  const [dragDistance, setDragDistance] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [dragStarted, setDragStarted] = useState(false);
+  const resetDrag = () => {
+    gesture.current = null;
+    setDragging(false);
+    setDragDistance(0);
+  };
+  useEffect(() => {
+    if (open) {
+      resetDrag();
+      setDragStarted(false);
+    }
+  }, [open]);
   if (!visible) return null;
   return createPortal(
     <div
@@ -165,18 +181,55 @@ export function BottomSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby={id}
+        style={
+          open && dragStarted
+            ? {
+                transform: `translateY(${dragDistance}px)`,
+                animation: "none",
+                transition: dragging ? "none" : "transform 180ms ease-out",
+              }
+            : undefined
+        }
         className={cn(
           "sheet-panel absolute inset-x-0 bottom-0 flex max-h-[90%] flex-col rounded-t-2xl bg-sheet text-sheet-foreground pb-safe shadow-sheet outline-none",
           className,
         )}
       >
         <div
-          onTouchStart={(e) => {
-            start.current = e.touches[0]!.clientY;
+          data-testid="sheet-drag-handle"
+          onPointerDown={(e) => {
+            if (!swipeToDismiss || !open) return;
+            if (gesture.current || !e.isPrimary) {
+              resetDrag();
+              return;
+            }
+            gesture.current = {
+              id: e.pointerId,
+              y: e.clientY,
+              time: performance.now(),
+              distance: 0,
+            };
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setDragStarted(true);
+            setDragging(true);
           }}
-          onTouchEnd={(e) => {
-            if (e.changedTouches[0]!.clientY - start.current > 70) dismiss();
+          onPointerMove={(e) => {
+            const g = gesture.current;
+            if (!g || g.id !== e.pointerId) return;
+            g.distance = Math.max(0, e.clientY - g.y);
+            setDragDistance(g.distance);
           }}
+          onPointerUp={(e) => {
+            const g = gesture.current;
+            if (!g || g.id !== e.pointerId) return;
+            const elapsed = Math.max(1, performance.now() - g.time);
+            const shouldClose = g.distance > 80 || (g.distance > 30 && g.distance / elapsed > 0.6);
+            resetDrag();
+            if (shouldClose) dismiss();
+          }}
+          onPointerCancel={resetDrag}
+          onLostPointerCapture={resetDrag}
+          style={swipeToDismiss ? { touchAction: "none" } : undefined}
           className="flex min-h-6 items-center justify-center"
         >
           <span className="h-1 w-10 rounded-full bg-muted-foreground/40" />
@@ -437,7 +490,13 @@ export function MediaView({
     observer.observe(el);
     return () => observer.disconnect();
   }, [smartFit, m.src]);
-  const [error, setError] = useState(false);
+  const [error, setError] = useState<number | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    setError(null);
+    setBlocked(false);
+    setProgress(0);
+  }, [m.src]);
   const [blocked, setBlocked] = useState(false);
   const [progress, setProgress] = useState(0);
   const { lang, state } = useGallery();
@@ -458,22 +517,47 @@ export function MediaView({
       document.removeEventListener("visibilitychange", update);
       v.pause();
     };
-  }, [active, visibleMode, paused, m.src]);
+  }, [active, visibleMode, paused, m.src, attempt, error]);
   if (error)
     return (
       <div
         role="status"
-        className="flex h-full items-center justify-center bg-media p-6 text-center text-sm text-media-foreground"
+        className="flex h-full flex-col items-center justify-center bg-media p-6 text-center text-sm text-media-foreground"
       >
         {lang === "ar"
           ? "الملف غير متاح أو تنسيقه غير مدعوم"
           : "Media unavailable or unsupported format"}
+        {m.kind === "video" && (
+          <div className="mt-3 flex flex-col items-center gap-3">
+            <span>
+              {lang === "ar"
+                ? error === 4
+                  ? "قد لا يدعم المتصفح صيغة الفيديو، أو تعذر تحميل المصدر."
+                  : "تعذر تحميل الفيديو. تحقق من الاتصال أو اختر ملفًا متوافقًا."
+                : error === 4
+                  ? "The format may be unsupported, or the source could not be loaded."
+                  : "Could not load video. Check your connection or choose a compatible file."}
+            </span>
+            <button
+              className="rounded-lg bg-white px-4 py-2 text-black"
+              onClick={(e) => {
+                e.stopPropagation();
+                setError(null);
+                setBlocked(false);
+                setAttempt((n) => n + 1);
+              }}
+            >
+              {lang === "ar" ? "إعادة المحاولة" : "Retry"}
+            </button>
+          </div>
+        )}
       </div>
     );
   if (m.kind === "video")
     return (
       <div ref={box} className="relative h-full w-full">
         <video
+          key={`${m.src}-${attempt}`}
           ref={ref}
           src={m.src}
           poster={m.poster}
@@ -485,7 +569,7 @@ export function MediaView({
             const { videoWidth: width, videoHeight: height } = e.currentTarget;
             setGeometry((g) => ({ ...g, width, height }));
           }}
-          onError={() => setError(true)}
+          onError={(e) => setError(e.currentTarget.error?.code ?? 4)}
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
             setProgress(v.duration ? (v.currentTime / v.duration) * 100 : 0);
@@ -512,7 +596,7 @@ export function MediaView({
               ref.current
                 ?.play()
                 .then(() => setBlocked(false))
-                .catch(() => setError(true));
+                .catch(() => setBlocked(true));
             }}
             className="absolute inset-0 m-auto flex size-16 items-center justify-center rounded-full bg-overlay text-white"
           >
@@ -542,7 +626,7 @@ export function MediaView({
     <img
       src={m.src}
       alt={lang === "ar" ? "صورة من المعرض" : "Gallery photo"}
-      onError={() => setError(true)}
+      onError={() => setError(4)}
       draggable={false}
       loading="lazy"
       className={cn("h-full w-full object-cover", className)}

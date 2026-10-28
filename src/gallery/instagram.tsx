@@ -92,7 +92,7 @@ export function InstagramMode() {
             <div className="ig-stories flex overflow-x-auto no-scrollbar">
               <StoryBubble label={g.t("yourStory")} onClick={() => toast(g.t("uploadDisabled"))}>
                 <span className="relative">
-                  <Avatar p={g.profile(ME)} size={80} />
+                  <Avatar p={g.profile(ME)} size={72} />
                   <span className="absolute bottom-0 end-0 flex size-[23px] items-center justify-center rounded-full border-2 border-background bg-foreground text-background">
                     <Plus className="size-4" strokeWidth={3} />
                   </span>
@@ -100,7 +100,7 @@ export function InstagramMode() {
               </StoryBubble>
               {storyAuthors.map((p, i) => (
                 <StoryBubble key={p.id} label={p.handle} onClick={() => setStory(i)}>
-                  <Avatar p={p} size={88} ring seen={!!g.state.seenStories[p.id]} />
+                  <Avatar p={p} size={78} ring seen={!!g.state.seenStories[p.id]} />
                 </StoryBubble>
               ))}
             </div>
@@ -184,6 +184,7 @@ export function InstagramMode() {
 
       <BottomSheet
         open={!!comments}
+        swipeToDismiss
         onClose={() => setComments(null)}
         title={g.t("comments")}
         className="h-[75%]"
@@ -238,7 +239,7 @@ function StoryBubble({
       className="ig-story flex shrink-0 flex-col items-center justify-end gap-1"
     >
       {children}
-      <span className="w-full truncate text-center text-[14px]">{label}</span>
+      <span className="w-full truncate text-center text-[12px]">{label}</span>
     </button>
   );
 }

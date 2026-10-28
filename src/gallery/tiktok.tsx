@@ -203,6 +203,7 @@ export function TikTokMode() {
       </nav>
       <BottomSheet
         open={!!comments}
+        swipeToDismiss
         onClose={() => setComments(null)}
         className="h-[70%]"
         title={
